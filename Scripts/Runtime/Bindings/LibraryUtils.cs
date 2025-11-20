@@ -53,6 +53,11 @@ namespace OdinInterop
         }
 
 #endif
+
+        public static unsafe T GetDelegate<T>(ulong libraryHandle, string functionName) where T : class
+        {
+            return GetDelegate<T>(new IntPtr(*(long*)&libraryHandle), functionName);
+        }
     }
 }
 #endif

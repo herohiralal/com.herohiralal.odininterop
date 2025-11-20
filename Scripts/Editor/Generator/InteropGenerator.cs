@@ -5,6 +5,7 @@ using UnityEngine;
 using System.IO;
 using System.Text;
 using System.Reflection;
+using System.Linq;
 
 namespace OdinInterop.Editor
 {
@@ -14,14 +15,13 @@ namespace OdinInterop.Editor
         private static readonly string PROJECT_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "OdinInterop"));
         private static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
 
-        private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256);
-        private static HashSet<Type> s_ImportedTypes = new HashSet<Type>(256);
+        private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256); // to create in odin
+        private static HashSet<Type> s_ImportedTypes = new HashSet<Type>(256); // to create interoperable proxies in C#
 
         [MenuItem("Tools/Odin Interop/Generate Interop Code")]
         private static void GenerateInteropCode()
         {
             s_ExportedTypes.Clear();
-            s_ImportedTypes.Clear();
 
             // create a clean odn out dir
             {
@@ -95,6 +95,8 @@ namespace OdinInterop.Editor
 
         private static void GenerateInteropCodeInternal(Type t, bool isEngineCode)
         {
+            s_ImportedTypes.Clear();
+
             string asmName = t.Assembly.GetName().Name;
             var asmIsSpl = false;
 
@@ -127,11 +129,11 @@ namespace OdinInterop.Editor
                 );
             }
 
-            var exportedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static);
+            var exportedFns = (t.GetMethods(BindingFlags.Public | BindingFlags.Static)).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
             var nothingToExport = (exportedFns.Length == 0);
 
             var toImport = t.GetNestedType("ToImport", BindingFlags.Public | BindingFlags.NonPublic);
-            var importedFns = toImport?.GetMethods(BindingFlags.Public | BindingFlags.Static) ?? Array.Empty<MethodInfo>();
+            var importedFns = (toImport?.GetMethods(BindingFlags.Public | BindingFlags.Static) ?? Array.Empty<MethodInfo>()).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
             var nothingToImport = (importedFns.Length == 0);
 
             var tgtFile = Path.GetFullPath(Path.Combine(containingDir, $"{t.Name}.g.cs"));
@@ -172,13 +174,13 @@ namespace OdinInterop.Editor
             foreach (var exportedFn in exportedFns)
             {
                 s_StrBld.AppendIndent().Append("public delegate ");
-                s_StrBld.Append(exportedFn.ReturnType.FullName.Replace("+", ".")).Append(' ');
-                s_StrBld.Append($"odntrop_del_{exportedFn.Name}(");
+                s_StrBld.AppendCSharpTypeName(exportedFn.ReturnType, true);
+                s_StrBld.Append($" odntrop_del_{exportedFn.Name}(");
                 var parms = exportedFn.GetParameters();
                 for (int i = 0; i < parms.Length; i++)
                 {
                     var p = parms[i];
-                    s_StrBld.Append(p.ParameterType.FullName.Replace("+", ".")).Append(' ').Append(p.Name);
+                    s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
                     if (i < parms.Length - 1)
                     {
                         s_StrBld.Append(", ");
@@ -200,13 +202,13 @@ namespace OdinInterop.Editor
             foreach (var importedFn in importedFns)
             {
                 s_StrBld.AppendIndent().Append("public delegate ");
-                s_StrBld.Append(importedFn.ReturnType.FullName.Replace("+", ".")).Append(' ');
-                s_StrBld.Append($"odntrop_del_{importedFn.Name}(");
+                s_StrBld.AppendCSharpTypeName(importedFn.ReturnType, true);
+                s_StrBld.Append($" odntrop_del_{importedFn.Name}(");
                 var parms = importedFn.GetParameters();
                 for (int i = 0; i < parms.Length; i++)
                 {
                     var p = parms[i];
-                    s_StrBld.Append(p.ParameterType.FullName.Replace("+", ".")).Append(' ').Append(p.Name);
+                    s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
                     if (i < parms.Length - 1)
                     {
                         s_StrBld.Append(", ");
@@ -220,6 +222,15 @@ namespace OdinInterop.Editor
 
             s_StrBld.AppendIndent().AppendLine("[InitializeOnLoadMethod]");
             s_StrBld.AppendIndent().AppendLine("private static void odntrop_EditorInit()");
+            s_StrBld.AppendIndent().AppendLine("{");
+            s_StrBldIndent++;
+            s_StrBld.AppendIndent().AppendLine("OdinCompilerUtils.onHotReload += odntrop_OnHotReload;");
+            s_StrBld.AppendIndent().AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);");
+            s_StrBldIndent--;
+            s_StrBld.AppendIndent().AppendLine("}");
+
+            // on hot reload
+            s_StrBld.AppendIndent().AppendLine("private static void odntrop_OnHotReload(ulong libraryHandle)");
             s_StrBld.AppendIndent().AppendLine("{");
             s_StrBldIndent++;
             s_StrBldIndent--;
@@ -240,6 +251,111 @@ namespace OdinInterop.Editor
             }
 
             File.WriteAllText(tgtFile, s_StrBld.ToString());
+        }
+
+        private static StringBuilder AppendCSharpTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
+        {
+            if (t == typeof(void))
+            {
+                sb.Append("void");
+            }
+            else if (t == typeof(byte))
+            {
+                sb.Append("byte");
+            }
+            else if (t == typeof(sbyte))
+            {
+                sb.Append("sbyte");
+            }
+            else if (t == typeof(short))
+            {
+                sb.Append("short");
+            }
+            else if (t == typeof(ushort))
+            {
+                sb.Append("ushort");
+            }
+            else if (t == typeof(int))
+            {
+                sb.Append("int");
+            }
+            else if (t == typeof(uint))
+            {
+                sb.Append("uint");
+            }
+            else if (t == typeof(long))
+            {
+                sb.Append("long");
+            }
+            else if (t == typeof(ulong))
+            {
+                sb.Append("ulong");
+            }
+            else if (t == typeof(float))
+            {
+                sb.Append("float");
+            }
+            else if (t == typeof(double))
+            {
+                sb.Append("double");
+            }
+            else if (t == typeof(bool))
+            {
+                sb.Append("bool");
+            }
+            else if (t == typeof(Vector2))
+            {
+                sb.Append("UnityEngine.Vector2");
+            }
+            else if (t == typeof(Vector3))
+            {
+                sb.Append("UnityEngine.Vector3");
+            }
+            else if (t == typeof(Vector4))
+            {
+                sb.Append("UnityEngine.Vector4");
+            }
+            else if (t == typeof(Quaternion))
+            {
+                sb.Append("UnityEngine.Quaternion");
+            }
+            else if (t == typeof(Color))
+            {
+                sb.Append("UnityEngine.Color");
+            }
+            else if (t.IsEnum)
+            {
+                sb.Append(t.FullName.Replace('+', '.'));
+                s_ExportedTypes.Add(t); // only need to export; c# side is already blittable
+            }
+            else if (typeof(UnityEngine.Object).IsAssignableFrom(t)) // unity object or subclass
+            {
+                if (useInteroperableVersion) // instance id
+                {
+                    sb.Append("int");
+                }
+                else
+                {
+                    sb.Append(t.FullName.Replace('+', '.'));
+                }
+            }
+            else
+            {
+                if (useInteroperableVersion)
+                {
+                    sb.Append("odntrop_type_");
+                    sb.Append(t.FullName.Replace('+', '.').Replace(".", "___"));
+                }
+                else
+                {
+                    sb.Append(t.FullName.Replace('+', '.'));
+                }
+
+                s_ExportedTypes.Add(t);
+                s_ImportedTypes.Add(t); // need to create a blittable proxy
+            }
+
+            return sb;
         }
     }
 }
