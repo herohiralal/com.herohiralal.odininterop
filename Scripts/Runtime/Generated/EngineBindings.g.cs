@@ -1,14 +1,12 @@
-// toimport found = True
 using OdinInterop;
 using System;
 using System.Collections.Generic;
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEditor.Callbacks;
 #endif
 using UnityEngine;
 
-namespace OdinInterop.Editor
+namespace OdinInterop
 {
 	public static partial class EngineBindings
 	{
@@ -19,6 +17,10 @@ namespace OdinInterop.Editor
 			"odininteropcode";
 #endif
 #if UNITY_EDITOR
+		[InitializeOnLoadMethod]
+		private static void odntrop_EditorInit()
+		{
+		}
 #else
 #endif
 	}

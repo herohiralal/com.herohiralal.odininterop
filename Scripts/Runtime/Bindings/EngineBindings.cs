@@ -1,4 +1,4 @@
-namespace OdinInterop.Editor
+namespace OdinInterop
 {
     public static partial class EngineBindings
     {

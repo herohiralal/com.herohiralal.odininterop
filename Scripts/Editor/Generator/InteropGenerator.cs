@@ -11,21 +11,33 @@ namespace OdinInterop.Editor
     internal static class InteropGenerator
     {
         private static readonly string ENGINE_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "com.herohiralal.odininterop", "Scripts", "Runtime", "Generated"));
-        private static readonly string PROJECT_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "OdinInterop", "Generated"));
-        private static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop", "Generated"));
+        private static readonly string PROJECT_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "OdinInterop"));
+        private static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
 
-        private static HashSet<Type> s_ExportedTypes = new HashSet<Type>();
+        private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256);
+        private static HashSet<Type> s_ImportedTypes = new HashSet<Type>(256);
 
         [MenuItem("Tools/Odin Interop/Generate Interop Code")]
         private static void GenerateInteropCode()
         {
             s_ExportedTypes.Clear();
+            s_ImportedTypes.Clear();
 
-            if (Directory.Exists(ODIN_INTEROP_OUT_DIR))
+            // create a clean odn out dir
             {
-                Directory.Delete(ODIN_INTEROP_OUT_DIR, true);
+                if (!Directory.Exists(ODIN_INTEROP_OUT_DIR))
+                {
+                    Directory.CreateDirectory(ODIN_INTEROP_OUT_DIR);
+                }
+
+                foreach (var file in Directory.GetFiles(ODIN_INTEROP_OUT_DIR, "odntrop_*.odin", SearchOption.TopDirectoryOnly))
+                {
+                    if (File.Exists(file))
+                    {
+                        File.Delete(file);
+                    }
+                }
             }
-            Directory.CreateDirectory(ODIN_INTEROP_OUT_DIR);
 
 #if ODIN_INTEROP_REGENERATE_ENGINE_CODE
             if (Directory.Exists(ENGINE_APIS_OUT_DIR))
@@ -70,10 +82,10 @@ namespace OdinInterop.Editor
         }
 
         private static StringBuilder s_StrBld = new StringBuilder(16384);
-        private static int s_StdBldIndent = 0;
-        private static StringBuilder AppendStrBldIndent(this StringBuilder sb)
+        private static int s_StrBldIndent = 0;
+        private static StringBuilder AppendIndent(this StringBuilder sb)
         {
-            for (int i = 0; i < s_StdBldIndent; i++)
+            for (int i = 0; i < s_StrBldIndent; i++)
             {
                 sb.Append('\t');
             }
@@ -131,7 +143,6 @@ namespace OdinInterop.Editor
             s_StrBld.AppendLine("using System.Collections.Generic;");
             s_StrBld.AppendLine("#if UNITY_EDITOR");
             s_StrBld.AppendLine("using UnityEditor;");
-            s_StrBld.AppendLine("using UnityEditor.Callbacks;");
             s_StrBld.AppendLine("#endif");
             s_StrBld.AppendLine("using UnityEngine;");
             s_StrBld.AppendLine();
@@ -140,42 +151,91 @@ namespace OdinInterop.Editor
             {
                 s_StrBld.AppendLine($"namespace {t.Namespace}");
                 s_StrBld.AppendLine("{");
-                s_StdBldIndent++;
+                s_StrBldIndent++;
             }
 
-            s_StrBld.AppendStrBldIndent().AppendLine($"public static partial class {t.Name}");
-            s_StrBld.AppendStrBldIndent().AppendLine("{");
-            s_StdBldIndent++;
+            s_StrBld.AppendIndent().AppendLine($"public static partial class {t.Name}");
+            s_StrBld.AppendIndent().AppendLine("{");
+            s_StrBldIndent++;
 
             // dll name
-            s_StrBld.AppendStrBldIndent().AppendLine("private const string k_OdinInteropDllName = ");
-            s_StdBldIndent++;
+            s_StrBld.AppendIndent().AppendLine("private const string k_OdinInteropDllName = ");
+            s_StrBldIndent++;
             s_StrBld.AppendLine("#if UNITY_IOS && !UNITY_EDITOR");
-            s_StrBld.AppendStrBldIndent().AppendLine("\"__Internal\";");
+            s_StrBld.AppendIndent().AppendLine("\"__Internal\";");
             s_StrBld.AppendLine("#else");
-            s_StrBld.AppendStrBldIndent().AppendLine("\"odininteropcode\";");
+            s_StrBld.AppendIndent().AppendLine("\"odininteropcode\";");
             s_StrBld.AppendLine("#endif");
-            s_StdBldIndent--;
+            s_StrBldIndent--;
 
             // generate some delegates
             foreach (var exportedFn in exportedFns)
             {
+                s_StrBld.AppendIndent().Append("public delegate ");
+                s_StrBld.Append(exportedFn.ReturnType.FullName.Replace("+", ".")).Append(' ');
+                s_StrBld.Append($"odntrop_del_{exportedFn.Name}(");
+                var parms = exportedFn.GetParameters();
+                for (int i = 0; i < parms.Length; i++)
+                {
+                    var p = parms[i];
+                    s_StrBld.Append(p.ParameterType.FullName.Replace("+", ".")).Append(' ').Append(p.Name);
+                    if (i < parms.Length - 1)
+                    {
+                        s_StrBld.Append(", ");
+                    }
+                }
+                s_StrBld.AppendLine(");");
+
+                s_StrBld
+                    .AppendIndent()
+                    .Append("public delegate void odntrop_del_Set")
+                    .Append(exportedFn.Name)
+                    .Append("Delegate(")
+                    .Append("odntrop_del_")
+                    .Append(exportedFn.Name)
+                    .AppendLine(" value);");
+
+            }
+
+            foreach (var importedFn in importedFns)
+            {
+                s_StrBld.AppendIndent().Append("public delegate ");
+                s_StrBld.Append(importedFn.ReturnType.FullName.Replace("+", ".")).Append(' ');
+                s_StrBld.Append($"odntrop_del_{importedFn.Name}(");
+                var parms = importedFn.GetParameters();
+                for (int i = 0; i < parms.Length; i++)
+                {
+                    var p = parms[i];
+                    s_StrBld.Append(p.ParameterType.FullName.Replace("+", ".")).Append(' ').Append(p.Name);
+                    if (i < parms.Length - 1)
+                    {
+                        s_StrBld.Append(", ");
+                    }
+                }
+                s_StrBld.AppendLine(");");
             }
 
             // editor-specific code (hot-reload style)
             s_StrBld.AppendLine("#if UNITY_EDITOR");
+
+            s_StrBld.AppendIndent().AppendLine("[InitializeOnLoadMethod]");
+            s_StrBld.AppendIndent().AppendLine("private static void odntrop_EditorInit()");
+            s_StrBld.AppendIndent().AppendLine("{");
+            s_StrBldIndent++;
+            s_StrBldIndent--;
+            s_StrBld.AppendIndent().AppendLine("}");
 
             // runtime code (bindings)
             s_StrBld.AppendLine("#else");
 
             s_StrBld.AppendLine("#endif");
 
-            s_StdBldIndent--;
-            s_StrBld.AppendStrBldIndent().AppendLine("}");
+            s_StrBldIndent--;
+            s_StrBld.AppendIndent().AppendLine("}");
 
             if (!string.IsNullOrWhiteSpace(t.Namespace))
             {
-                s_StdBldIndent--;
+                s_StrBldIndent--;
                 s_StrBld.AppendLine("}");
             }
 

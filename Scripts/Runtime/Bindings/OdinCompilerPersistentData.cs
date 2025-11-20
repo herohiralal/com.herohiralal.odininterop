@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace OdinInterop.Editor
+namespace OdinInterop
 {
     public class OdinCompilerPersistentData : ScriptableObject
     {
