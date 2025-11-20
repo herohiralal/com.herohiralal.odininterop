@@ -1,0 +1,12 @@
+{
+    "name": "com.herohiralal.odininterop",
+    "displayName": "Odin Interop",
+    "author": {
+        "name": "Rohan Jadav",
+        "url": "https://github.com/herohiralal"
+    },
+    "version": "1.0.0",
+    "unity": "6000.0",
+    "description": "Odin Interop Engine for Unity.",
+    "license": "Apache-2.0"
+}
