@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using System.IO;
 using System.Text;
+using System.Reflection;
 
 namespace OdinInterop.Editor
 {
@@ -114,6 +115,13 @@ namespace OdinInterop.Editor
                 );
             }
 
+            var exportedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static);
+            var nothingToExport = (exportedFns.Length == 0);
+
+            var toImport = t.GetNestedType("ToImport", BindingFlags.Public | BindingFlags.NonPublic);
+            var importedFns = toImport?.GetMethods(BindingFlags.Public | BindingFlags.Static) ?? Array.Empty<MethodInfo>();
+            var nothingToImport = (importedFns.Length == 0);
+
             var tgtFile = Path.GetFullPath(Path.Combine(containingDir, $"{t.Name}.g.cs"));
 
             s_StrBld.Clear();
@@ -123,6 +131,7 @@ namespace OdinInterop.Editor
             s_StrBld.AppendLine("using System.Collections.Generic;");
             s_StrBld.AppendLine("#if UNITY_EDITOR");
             s_StrBld.AppendLine("using UnityEditor;");
+            s_StrBld.AppendLine("using UnityEditor.Callbacks;");
             s_StrBld.AppendLine("#endif");
             s_StrBld.AppendLine("using UnityEngine;");
             s_StrBld.AppendLine();
@@ -148,9 +157,18 @@ namespace OdinInterop.Editor
             s_StrBld.AppendLine("#endif");
             s_StdBldIndent--;
 
+            // generate some delegates
+            foreach (var exportedFn in exportedFns)
+            {
+            }
+
             // editor-specific code (hot-reload style)
+            s_StrBld.AppendLine("#if UNITY_EDITOR");
 
             // runtime code (bindings)
+            s_StrBld.AppendLine("#else");
+
+            s_StrBld.AppendLine("#endif");
 
             s_StdBldIndent--;
             s_StrBld.AppendStrBldIndent().AppendLine("}");
