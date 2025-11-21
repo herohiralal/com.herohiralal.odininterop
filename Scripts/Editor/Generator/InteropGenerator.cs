@@ -200,7 +200,6 @@ namespace OdinInterop.Editor
 
                 }
 
-                // set up proper hot reload for imported functions
                 foreach (var importedFn in importedFns)
                 {
                     s_StrBld.AppendIndent().Append("public delegate ");
@@ -266,6 +265,7 @@ namespace OdinInterop.Editor
                 // editor-specific code (hot-reload style)
                 s_StrBld.AppendLine("#if UNITY_EDITOR");
 
+                // set up proper hot reload for imported functions
                 foreach (var importedFn in importedFns)
                 {
                     s_StrBld
@@ -350,7 +350,7 @@ namespace OdinInterop.Editor
                         .Append(exportedFn.Name)
                         .Append("Delegate>(libraryHandle, ")
                         .Append($"\"odntrop_export_setter_{tyName}_{exportedFn.Name}\"")
-                        .Append(").Invoke(odntrop_exported_")
+                        .Append(")?.Invoke(odntrop_exported_")
                         .Append(exportedFn.Name)
                         .AppendLine(");");
                 }
@@ -382,7 +382,165 @@ namespace OdinInterop.Editor
                     .Clear()
                     .AppendLine("#+vet !tabs !unused !style")
                     .AppendLine("package src")
+                    .AppendLine()
+                    .AppendLine("@require import \"base:runtime\"")
                     .AppendLine();
+
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .Append($"odntrop_del_{tyName}_{importedFn.Name} :: #type proc(");
+
+                    var parms = importedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
+                        s_StrBld.Append(", ");
+                    }
+
+                    s_StrBld.Append(")");
+                    if (importedFn.ReturnType != typeof(void))
+                    {
+                        s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType, false);
+                    }
+
+                    s_StrBld.AppendLine();
+
+                    s_StrBld
+                        .AppendIndent()
+                        .AppendLine("@(export, private = \"file\")")
+                        .AppendIndent()
+                        .Append($"odntrop_export_{tyName}_{importedFn.Name} :: proc \"c\" (");
+
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, true);
+                        s_StrBld.Append(", ");
+                    }
+
+                    s_StrBld.Append(")");
+                    if (importedFn.ReturnType != typeof(void))
+                    {
+                        s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType, true);
+                    }
+
+                    s_StrBld.AppendLine(" {");
+
+                    s_StrBldIndent++;
+                    s_StrBld
+                        .AppendIndent()
+                        .AppendLine("context = runtime.default_context()")
+                        .AppendIndent()
+                        .Append(importedFn.ReturnType == typeof(void) ? "" : "return ")
+                        .Append($"odntrop_{tyName}_{importedFn.Name}(");
+
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name);
+                        s_StrBld.Append(", ");
+                    }
+
+                    s_StrBld.AppendLine(")");
+
+                    s_StrBldIndent--;
+                    s_StrBld.AppendIndent().AppendLine("}");
+                }
+
+                foreach (var exportedFn in exportedFns)
+                {
+                    // delegate
+                    {
+                        s_StrBld
+                            .AppendIndent()
+                            .AppendLine("@(private = \"file\")")
+                            .AppendIndent()
+                            .Append($"odntrop_del_{tyName}_{exportedFn.Name} :: #type proc \"c\" (");
+
+                        var parms = exportedFn.GetParameters();
+                        for (int i = 0; i < parms.Length; i++)
+                        {
+                            var p = parms[i];
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, true);
+                            s_StrBld.Append(", ");
+                        }
+
+                        s_StrBld.Append(")");
+                        if (exportedFn.ReturnType != typeof(void))
+                        {
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType, true);
+                        }
+
+                        s_StrBld.AppendLine();
+                    }
+
+                    // delegate global var
+                    {
+                        s_StrBld
+                            .AppendIndent()
+                            .AppendLine("@(private = \"file\")")
+                            .AppendIndent()
+                            .AppendLine($"odntrop_dydel_{tyName}_{exportedFn.Name}: odntrop_del_{tyName}_{exportedFn.Name} = nil");
+                    }
+
+                    // global var setter fn
+                    {
+                        s_StrBld
+                            .AppendIndent()
+                            .AppendLine("@(export, private = \"file\")")
+                            .AppendIndent()
+                            .AppendLine($"odntrop_export_setter_{tyName}_{exportedFn.Name} :: proc (value: odntrop_del_{tyName}_{exportedFn.Name}) {{");
+
+                        s_StrBldIndent++;
+                        s_StrBld
+                            .AppendIndent()
+                            .AppendLine($"odntrop_dydel_{tyName}_{exportedFn.Name} = value");
+                        s_StrBldIndent--;
+                        s_StrBld.AppendIndent().AppendLine("}");
+                    }
+
+                    {
+                        s_StrBld
+                            .AppendIndent()
+                            .Append($"{tyName}_{exportedFn.Name} :: proc(");
+
+                        var parms = exportedFn.GetParameters();
+                        for (int i = 0; i < parms.Length; i++)
+                        {
+                            var p = parms[i];
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
+                            s_StrBld.Append(", ");
+                        }
+
+                        s_StrBld.Append(")");
+                        if (exportedFn.ReturnType != typeof(void))
+                        {
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType, false);
+                        }
+
+                        s_StrBld.AppendLine(" {");
+                        s_StrBldIndent++;
+                        s_StrBld
+                            .AppendIndent()
+                            .Append(exportedFn.ReturnType == typeof(void) ? "" : "return ")
+                            .Append($"odntrop_dydel_{tyName}_{exportedFn.Name}(");
+
+                        for (int i = 0; i < parms.Length; i++)
+                        {
+                            var p = parms[i];
+                            s_StrBld.Append(p.Name);
+                            s_StrBld.Append(", ");
+                        }
+
+                        s_StrBld.AppendLine(")");
+
+                        s_StrBldIndent--;
+                        s_StrBld.AppendIndent().AppendLine("}");
+                    }
+                }
 
                 File.WriteAllText(tgtFile, s_StrBld.ToString());
             }
