@@ -39,7 +39,7 @@ namespace OdinInterop
 
         public static event Action<ulong> onHotReload = delegate { };
 
-        internal static void RaiseHotReloadEvt(ulong libH)
+        public static void RaiseHotReloadEvt(ulong libH)
         {
             s_InitialisedAfterDomainReload = true;
             onHotReload.Invoke(libH);

@@ -13,7 +13,7 @@ namespace OdinInterop.Editor
     {
         private static readonly string ENGINE_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Packages", "com.herohiralal.odininterop", "Scripts", "Runtime", "Generated"));
         private static readonly string PROJECT_APIS_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "OdinInterop"));
-        private static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
+        internal static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
 
         private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256); // to create in odin
         private static HashSet<Type> s_ImportedTypes = new HashSet<Type>(256); // to create interoperable proxies in C#
