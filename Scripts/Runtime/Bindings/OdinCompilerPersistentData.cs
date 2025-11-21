@@ -37,6 +37,12 @@ namespace OdinInterop
         private static bool s_InitialisedAfterDomainReload = false;
         public static bool initialisedAfterDomainReload => s_InitialisedAfterDomainReload;
 
-        public static event Action onHotReload = delegate { };
+        public static event Action<ulong> onHotReload = delegate { };
+
+        internal static void RaiseHotReloadEvt(ulong libH)
+        {
+            s_InitialisedAfterDomainReload = true;
+            onHotReload.Invoke(libH);
+        }
     }
 }

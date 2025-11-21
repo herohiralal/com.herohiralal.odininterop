@@ -129,128 +129,263 @@ namespace OdinInterop.Editor
                 );
             }
 
-            var exportedFns = (t.GetMethods(BindingFlags.Public | BindingFlags.Static)).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
-            var nothingToExport = (exportedFns.Length == 0);
+            var tyName = t.FullName.Replace('+', '.').Replace(".", "___");
+
+            var exportedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_") && x.GetCustomAttribute<GeneratedMethodAttribute>() == null).ToArray();
 
             var toImport = t.GetNestedType("ToImport", BindingFlags.Public | BindingFlags.NonPublic);
             var importedFns = (toImport?.GetMethods(BindingFlags.Public | BindingFlags.Static) ?? Array.Empty<MethodInfo>()).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
-            var nothingToImport = (importedFns.Length == 0);
 
-            var tgtFile = Path.GetFullPath(Path.Combine(containingDir, $"{t.Name}.g.cs"));
-
-            s_StrBld.Clear();
-
-            s_StrBld.AppendLine("using OdinInterop;");
-            s_StrBld.AppendLine("using System;");
-            s_StrBld.AppendLine("using System.Collections.Generic;");
-            s_StrBld.AppendLine("#if UNITY_EDITOR");
-            s_StrBld.AppendLine("using UnityEditor;");
-            s_StrBld.AppendLine("#endif");
-            s_StrBld.AppendLine("using UnityEngine;");
-            s_StrBld.AppendLine();
-
-            if (!string.IsNullOrWhiteSpace(t.Namespace))
             {
-                s_StrBld.AppendLine($"namespace {t.Namespace}");
-                s_StrBld.AppendLine("{");
+                var tgtFile = Path.GetFullPath(Path.Combine(containingDir, $"{t.Name}.g.cs"));
+
+                s_StrBld.Clear();
+
+                s_StrBld.AppendLine("using OdinInterop;");
+                s_StrBld.AppendLine("using System;");
+                s_StrBld.AppendLine("using System.Collections.Generic;");
+                s_StrBld.AppendLine("#if UNITY_EDITOR");
+                s_StrBld.AppendLine("using UnityEditor;");
+                s_StrBld.AppendLine("#endif");
+                s_StrBld.AppendLine("using UnityEngine;");
+                s_StrBld.AppendLine();
+
+                if (!string.IsNullOrWhiteSpace(t.Namespace))
+                {
+                    s_StrBld.AppendLine($"namespace {t.Namespace}");
+                    s_StrBld.AppendLine("{");
+                    s_StrBldIndent++;
+                }
+
+                s_StrBld.AppendIndent().AppendLine($"public static partial class {t.Name}");
+                s_StrBld.AppendIndent().AppendLine("{");
                 s_StrBldIndent++;
+
+                // dll name
+                s_StrBld.AppendIndent().AppendLine("private const string k_OdinInteropDllName = ");
+                s_StrBldIndent++;
+                s_StrBld.AppendLine("#if UNITY_IOS && !UNITY_EDITOR");
+                s_StrBld.AppendIndent().AppendLine("\"__Internal\";");
+                s_StrBld.AppendLine("#else");
+                s_StrBld.AppendIndent().AppendLine("\"odininteropcode\";");
+                s_StrBld.AppendLine("#endif");
+                s_StrBldIndent--;
+
+                // generate some delegates
+                foreach (var exportedFn in exportedFns)
+                {
+                    s_StrBld.AppendIndent().Append("public delegate ");
+                    s_StrBld.AppendCSharpTypeName(exportedFn.ReturnType, true);
+                    s_StrBld.Append($" odntrop_del_{exportedFn.Name}(");
+                    var parms = exportedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(");");
+
+                    s_StrBld
+                        .AppendIndent()
+                        .Append("public delegate void odntrop_del_Set")
+                        .Append(exportedFn.Name)
+                        .Append("Delegate(")
+                        .Append("odntrop_del_")
+                        .Append(exportedFn.Name)
+                        .AppendLine(" value);");
+
+                }
+
+                // set up proper hot reload for imported functions
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld.AppendIndent().Append("public delegate ");
+                    s_StrBld.AppendCSharpTypeName(importedFn.ReturnType, true);
+                    s_StrBld.Append($" odntrop_del_{importedFn.Name}(");
+                    var parms = importedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(");");
+                }
+
+                // set up p/invoke friendly-wrappers for exported functions
+                foreach (var exportedFn in exportedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .Append("[AOT.MonoPInvokeCallback(typeof(odntrop_del_")
+                        .Append(exportedFn.Name)
+                        .AppendLine("))]")
+                        .AppendIndent()
+                        .Append("private static ")
+                        .AppendCSharpTypeName(exportedFn.ReturnType, true)
+                        .Append(" odntrop_exported_")
+                        .Append(exportedFn.Name)
+                        .Append("(");
+
+                    var parms = exportedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(")");
+                    s_StrBld.AppendIndent().AppendLine("{");
+                    s_StrBldIndent++;
+                    s_StrBld.AppendIndent().Append(typeof(void) == exportedFn.ReturnType ? "" : "return ");
+                    s_StrBld.Append(exportedFn.Name).Append("(");
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(");");
+                    s_StrBldIndent--;
+                    s_StrBld.AppendIndent().AppendLine("}");
+                }
+
+                // editor-specific code (hot-reload style)
+                s_StrBld.AppendLine("#if UNITY_EDITOR");
+
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .Append("private static odntrop_del_")
+                        .Append(importedFn.Name)
+                        .Append(" odntrop_delref_")
+                        .Append(importedFn.Name)
+                        .AppendLine(";");
+
+                    s_StrBld
+                        .AppendIndent()
+                        .AppendLine("[GeneratedMethod]")
+                        .AppendIndent()
+                        .Append("public static ")
+                        .AppendCSharpTypeName(importedFn.ReturnType, false)
+                        .Append(" ")
+                        .Append(importedFn.Name)
+                        .Append("(");
+
+                    var parms = importedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, false).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(")");
+                    s_StrBld.AppendIndent().AppendLine("{");
+                    s_StrBldIndent++;
+                    s_StrBld.AppendIndent().Append(importedFn.ReturnType == typeof(void) ? "" : "return ");
+                    s_StrBld.Append("odntrop_delref_");
+                    s_StrBld.Append(importedFn.Name);
+                    s_StrBld.Append("(");
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(");");
+                    s_StrBldIndent--;
+                    s_StrBld.AppendIndent().AppendLine("}");
+                }
+
+                s_StrBld.AppendIndent().AppendLine("[InitializeOnLoadMethod]");
+                s_StrBld.AppendIndent().AppendLine("private static void odntrop_EditorInit()");
+                s_StrBld.AppendIndent().AppendLine("{");
+                s_StrBldIndent++;
+                s_StrBld.AppendIndent().AppendLine("OdinCompilerUtils.onHotReload += odntrop_OnHotReload;");
+                s_StrBld.AppendIndent().AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);");
+                s_StrBldIndent--;
+                s_StrBld.AppendIndent().AppendLine("}");
+
+                // on hot reload
+                s_StrBld.AppendIndent().AppendLine("private static void odntrop_OnHotReload(ulong libraryHandle)");
+                s_StrBld.AppendIndent().AppendLine("{");
+                s_StrBldIndent++;
+
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld.AppendIndent()
+                        .Append("odntrop_delref_")
+                        .Append(importedFn.Name)
+                        .Append(" = LibraryUtils.GetDelegate<odntrop_del_")
+                        .Append(importedFn.Name)
+                        .Append(">(libraryHandle, ")
+                        .Append($"\"odntrop_export_{tyName}_{importedFn.Name}\"")
+                        .AppendLine(");");
+                }
+
+                foreach (var exportedFn in exportedFns)
+                {
+                    s_StrBld.AppendIndent()
+                        .Append("LibraryUtils.GetDelegate<odntrop_del_Set")
+                        .Append(exportedFn.Name)
+                        .Append("Delegate>(libraryHandle, ")
+                        .Append($"\"odntrop_export_setter_{tyName}_{exportedFn.Name}\"")
+                        .Append(").Invoke(odntrop_exported_")
+                        .Append(exportedFn.Name)
+                        .AppendLine(");");
+                }
+
+                s_StrBldIndent--;
+                s_StrBld.AppendIndent().AppendLine("}");
+
+                // runtime code (bindings)
+                s_StrBld.AppendLine("#else");
+
+                s_StrBld.AppendLine("#endif");
+
+                s_StrBldIndent--;
+                s_StrBld.AppendIndent().AppendLine("}");
+
+                if (!string.IsNullOrWhiteSpace(t.Namespace))
+                {
+                    s_StrBldIndent--;
+                    s_StrBld.AppendLine("}");
+                }
+
+                File.WriteAllText(tgtFile, s_StrBld.ToString());
             }
 
-            s_StrBld.AppendIndent().AppendLine($"public static partial class {t.Name}");
-            s_StrBld.AppendIndent().AppendLine("{");
-            s_StrBldIndent++;
-
-            // dll name
-            s_StrBld.AppendIndent().AppendLine("private const string k_OdinInteropDllName = ");
-            s_StrBldIndent++;
-            s_StrBld.AppendLine("#if UNITY_IOS && !UNITY_EDITOR");
-            s_StrBld.AppendIndent().AppendLine("\"__Internal\";");
-            s_StrBld.AppendLine("#else");
-            s_StrBld.AppendIndent().AppendLine("\"odininteropcode\";");
-            s_StrBld.AppendLine("#endif");
-            s_StrBldIndent--;
-
-            // generate some delegates
-            foreach (var exportedFn in exportedFns)
             {
-                s_StrBld.AppendIndent().Append("public delegate ");
-                s_StrBld.AppendCSharpTypeName(exportedFn.ReturnType, true);
-                s_StrBld.Append($" odntrop_del_{exportedFn.Name}(");
-                var parms = exportedFn.GetParameters();
-                for (int i = 0; i < parms.Length; i++)
-                {
-                    var p = parms[i];
-                    s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
-                    if (i < parms.Length - 1)
-                    {
-                        s_StrBld.Append(", ");
-                    }
-                }
-                s_StrBld.AppendLine(");");
+                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{t.FullName.Replace('+', '.')}.odin"));
 
                 s_StrBld
-                    .AppendIndent()
-                    .Append("public delegate void odntrop_del_Set")
-                    .Append(exportedFn.Name)
-                    .Append("Delegate(")
-                    .Append("odntrop_del_")
-                    .Append(exportedFn.Name)
-                    .AppendLine(" value);");
+                    .Clear()
+                    .AppendLine("#+vet !tabs !unused !style")
+                    .AppendLine("package src")
+                    .AppendLine();
 
+                File.WriteAllText(tgtFile, s_StrBld.ToString());
             }
-
-            foreach (var importedFn in importedFns)
-            {
-                s_StrBld.AppendIndent().Append("public delegate ");
-                s_StrBld.AppendCSharpTypeName(importedFn.ReturnType, true);
-                s_StrBld.Append($" odntrop_del_{importedFn.Name}(");
-                var parms = importedFn.GetParameters();
-                for (int i = 0; i < parms.Length; i++)
-                {
-                    var p = parms[i];
-                    s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
-                    if (i < parms.Length - 1)
-                    {
-                        s_StrBld.Append(", ");
-                    }
-                }
-                s_StrBld.AppendLine(");");
-            }
-
-            // editor-specific code (hot-reload style)
-            s_StrBld.AppendLine("#if UNITY_EDITOR");
-
-            s_StrBld.AppendIndent().AppendLine("[InitializeOnLoadMethod]");
-            s_StrBld.AppendIndent().AppendLine("private static void odntrop_EditorInit()");
-            s_StrBld.AppendIndent().AppendLine("{");
-            s_StrBldIndent++;
-            s_StrBld.AppendIndent().AppendLine("OdinCompilerUtils.onHotReload += odntrop_OnHotReload;");
-            s_StrBld.AppendIndent().AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);");
-            s_StrBldIndent--;
-            s_StrBld.AppendIndent().AppendLine("}");
-
-            // on hot reload
-            s_StrBld.AppendIndent().AppendLine("private static void odntrop_OnHotReload(ulong libraryHandle)");
-            s_StrBld.AppendIndent().AppendLine("{");
-            s_StrBldIndent++;
-            s_StrBldIndent--;
-            s_StrBld.AppendIndent().AppendLine("}");
-
-            // runtime code (bindings)
-            s_StrBld.AppendLine("#else");
-
-            s_StrBld.AppendLine("#endif");
-
-            s_StrBldIndent--;
-            s_StrBld.AppendIndent().AppendLine("}");
-
-            if (!string.IsNullOrWhiteSpace(t.Namespace))
-            {
-                s_StrBldIndent--;
-                s_StrBld.AppendLine("}");
-            }
-
-            File.WriteAllText(tgtFile, s_StrBld.ToString());
         }
 
         private static StringBuilder AppendCSharpTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
@@ -338,6 +473,8 @@ namespace OdinInterop.Editor
                 {
                     sb.Append(t.FullName.Replace('+', '.'));
                 }
+
+                s_ExportedTypes.Add(t);
             }
             else
             {
@@ -353,6 +490,87 @@ namespace OdinInterop.Editor
 
                 s_ExportedTypes.Add(t);
                 s_ImportedTypes.Add(t); // need to create a blittable proxy
+            }
+
+            return sb;
+        }
+
+        private static StringBuilder AppendOdnTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
+        {
+            var isUnityNativeType = !string.IsNullOrWhiteSpace(t.Namespace) && t.Namespace.StartsWith("UnityEngine");
+            var resolvedName = isUnityNativeType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for unity native types, just use the type name
+
+            if (t == typeof(void))
+            {
+                sb.Append("()");
+            }
+            else if (t == typeof(byte))
+            {
+                sb.Append("u8");
+            }
+            else if (t == typeof(sbyte))
+            {
+                sb.Append("i8");
+            }
+            else if (t == typeof(short))
+            {
+                sb.Append("i16");
+            }
+            else if (t == typeof(ushort))
+            {
+                sb.Append("u16");
+            }
+            else if (t == typeof(int))
+            {
+                sb.Append("i32");
+            }
+            else if (t == typeof(uint))
+            {
+                sb.Append("u32");
+            }
+            else if (t == typeof(long))
+            {
+                sb.Append("i64");
+            }
+            else if (t == typeof(ulong))
+            {
+                sb.Append("u64");
+            }
+            else if (t == typeof(float))
+            {
+                sb.Append("f32");
+            }
+            else if (t == typeof(double))
+            {
+                sb.Append("f64");
+            }
+            else if (t == typeof(bool))
+            {
+                sb.Append("bool");
+            }
+            else if (t == typeof(Vector2))
+            {
+                sb.Append("[2]f32");
+            }
+            else if (t == typeof(Vector3))
+            {
+                sb.Append("[3]f32");
+            }
+            else if (t == typeof(Vector4))
+            {
+                sb.Append("[4]f32");
+            }
+            else if (t == typeof(Quaternion))
+            {
+                sb.Append("quaternion128");
+            }
+            else if (t == typeof(Color))
+            {
+                sb.Append("[4]f32");
+            }
+            else
+            {
+                sb.Append(resolvedName);
             }
 
             return sb;
