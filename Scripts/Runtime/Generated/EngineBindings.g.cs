@@ -16,17 +16,23 @@ namespace OdinInterop
 #else
 			"odininteropcode";
 #endif
+
 #if UNITY_EDITOR
+
 		[InitializeOnLoadMethod]
 		private static void odntrop_EditorInit()
 		{
 			OdinCompilerUtils.onHotReload += odntrop_OnHotReload;
 			if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);
 		}
+
 		private static void odntrop_OnHotReload(ulong libraryHandle)
 		{
+
 		}
+
 #else
+
 #endif
 	}
 }
