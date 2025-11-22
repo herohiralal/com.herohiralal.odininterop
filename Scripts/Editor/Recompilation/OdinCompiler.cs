@@ -11,23 +11,38 @@ namespace OdinInterop.Editor
     {
         private static readonly string ODIN_LIB_INPUT_PATH = InteropGenerator.ODIN_INTEROP_OUT_DIR;
         private static readonly string ODIN_LIB_OUTPUT_DIR_PATH = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "OdinInterop"));
+        private static readonly string ODIN_LIB_EDITOR_OUTPUT_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Editor", "Debug");
+        private static readonly string ODIN_LIB_EDITOR_OUTPUT_PATH = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH,
+#if UNITY_EDITOR_WIN
+            "OdinInteropEditor.dll"
+#else
+            "libOdinInteropEditor.so"
+#endif
+        );
 
         [InitializeOnLoadMethod]
-        private static unsafe void InitialiseEditor()
+        private static void InitialiseEditor()
         {
-            var ulv = OdinCompilerPersistentData.staticLibraryHandle;
-            if (ulv == 0) HotReload();
-            else OdinCompilerUtils.RaiseHotReloadEvt(ulv);
-        }
+            /**
+             * because of how unity domain reload works, we don't know if we've previously loaded this native lib
+             * so we just always load+unload it to clear up any dangling references
+             */
+            if (File.Exists(ODIN_LIB_EDITOR_OUTPUT_PATH))
+            {
+                LibraryUtils.CloseLibraryIfLoaded(ODIN_LIB_EDITOR_OUTPUT_PATH);
+            }
 
-        public static unsafe void HotReload()
-        {
-            if (!CompileOdinInteropLibrary(out var outputFile, null, false)) return;
-            var lv = LibraryUtils.OpenLibrary(outputFile).ToInt64();
-            var ulv = *(ulong*)&lv;
+            if (!CompileOdinInteropLibrary(out var outFile, null, false))
+                return;
 
-            OdinCompilerPersistentData.staticLibraryHandle = ulv;
-            OdinCompilerUtils.RaiseHotReloadEvt(ulv);
+            var libraryHandle = LibraryUtils.OpenLibrary(outFile);
+            if (libraryHandle == System.IntPtr.Zero)
+            {
+                Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library.");
+                return;
+            }
+
+            OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
 
         internal static bool CompileOdinInteropLibrary(out string outFile, BuildTargetGroup? tgt, bool isReleaseBuild)
@@ -61,13 +76,7 @@ namespace OdinInterop.Editor
             {
                 // no need to specify what platform yay
 
-#if UNITY_EDITOR_WIN
-                const string k_OutputLibName = "OdinInteropEditor.dll";
-#else
-                const string k_OutputLibName = "libOdinInteropEditor.so";
-#endif
-
-                outFile = Path.Combine(outDir, k_OutputLibName);
+                outFile = ODIN_LIB_EDITOR_OUTPUT_PATH;
                 psi.ArgumentList.Add($"-out:{outFile}");
                 psi.ArgumentList.Add("-build-mode:dynamic");
 

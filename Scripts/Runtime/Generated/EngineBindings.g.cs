@@ -23,10 +23,10 @@ namespace OdinInterop
 		private static void odntrop_EditorInit()
 		{
 			OdinCompilerUtils.onHotReload += odntrop_OnHotReload;
-			if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);
+			if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerUtils.libraryHandle);
 		}
 
-		private static void odntrop_OnHotReload(ulong libraryHandle)
+		private static void odntrop_OnHotReload(IntPtr libraryHandle)
 		{
 
 		}

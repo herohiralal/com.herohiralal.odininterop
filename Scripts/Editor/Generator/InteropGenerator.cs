@@ -330,12 +330,12 @@ namespace OdinInterop.Editor
                 s_StrBld.AppendIndent().AppendLine("{");
                 s_StrBldIndent++;
                 s_StrBld.AppendIndent().AppendLine("OdinCompilerUtils.onHotReload += odntrop_OnHotReload;");
-                s_StrBld.AppendIndent().AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerPersistentData.staticLibraryHandle);");
+                s_StrBld.AppendIndent().AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerUtils.libraryHandle);");
                 s_StrBldIndent--;
                 s_StrBld.AppendIndent().AppendLine("}").AppendLine();
 
                 // on hot reload
-                s_StrBld.AppendIndent().AppendLine("private static void odntrop_OnHotReload(ulong libraryHandle)");
+                s_StrBld.AppendIndent().AppendLine("private static void odntrop_OnHotReload(IntPtr libraryHandle)");
                 s_StrBld.AppendIndent().AppendLine("{");
                 s_StrBldIndent++;
 
