@@ -32,13 +32,28 @@ namespace OdinInterop.Editor
                 LibraryUtils.CloseLibraryIfLoaded(ODIN_LIB_EDITOR_OUTPUT_PATH);
             }
 
+            HotReload();
+        }
+
+        [MenuItem("Tools/Odin Interop/Hot Reload %&R")]
+        public static void HotReload()
+        {
+            if (OdinCompilerUtils.libraryHandle != System.IntPtr.Zero)
+            {
+                LibraryUtils.CloseLibrary(OdinCompilerUtils.libraryHandle);
+                OdinCompilerUtils.RaiseHotReloadEvt(System.IntPtr.Zero);
+            }
+
             if (!CompileOdinInteropLibrary(out var outFile, null, false))
+            {
+                Debug.LogError("[OdinCompiler]: Failed to compile OdinInteropEditor library. No active library present.");
                 return;
+            }
 
             var libraryHandle = LibraryUtils.OpenLibrary(outFile);
             if (libraryHandle == System.IntPtr.Zero)
             {
-                Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library.");
+                Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library. No active library present.");
                 return;
             }
 

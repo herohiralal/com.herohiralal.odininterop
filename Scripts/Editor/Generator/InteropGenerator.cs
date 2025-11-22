@@ -309,7 +309,7 @@ namespace OdinInterop.Editor
                         s_StrBld.AppendIndent().Append(importedFn.ReturnType == typeof(void) ? "" : "return ");
                         s_StrBld.Append("odntrop_delref_");
                         s_StrBld.Append(importedFn.Name);
-                        s_StrBld.Append("(");
+                        s_StrBld.Append("?.Invoke(");
                         for (int i = 0; i < parms.Length; i++)
                         {
                             var p = parms[i];
@@ -319,7 +319,8 @@ namespace OdinInterop.Editor
                                 s_StrBld.Append(", ");
                             }
                         }
-                        s_StrBld.AppendLine(");");
+                        s_StrBld.Append(")").Append(importedFn.ReturnType == typeof(void) ? "" : " ?? default");
+                        s_StrBld.AppendLine(";");
                         s_StrBldIndent--;
                         s_StrBld.AppendIndent().AppendLine("}").AppendLine();
                     }
@@ -344,14 +345,18 @@ namespace OdinInterop.Editor
                     s_StrBld.AppendIndent()
                         .Append("odntrop_delref_")
                         .Append(importedFn.Name)
-                        .Append(" = LibraryUtils.GetDelegate<odntrop_del_")
+                        .Append(" = libraryHandle == IntPtr.Zero ? null : LibraryUtils.GetDelegate<odntrop_del_")
                         .Append(importedFn.Name)
                         .Append(">(libraryHandle, ")
                         .Append($"\"odntrop_export_{tyName}_{importedFn.Name}\"")
                         .AppendLine(");");
                 }
 
-                s_StrBld.AppendLine();
+                s_StrBld
+                    .AppendLine()
+                    .AppendIndent()
+                    .AppendLine("if (libraryHandle == IntPtr.Zero) return;")
+                    .AppendLine();
 
                 foreach (var exportedFn in exportedFns)
                 {
