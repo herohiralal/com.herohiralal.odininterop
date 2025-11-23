@@ -15,7 +15,7 @@ namespace OdinInterop
 #if UNITY_IOS && !UNITY_EDITOR
 			"__Internal";
 #else
-			"odininteropcode";
+			"OdinInterop";
 #endif
 
 #if UNITY_EDITOR

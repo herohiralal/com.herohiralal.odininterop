@@ -168,7 +168,7 @@ namespace OdinInterop.Editor
                 s_StrBld.AppendLine("#if UNITY_IOS && !UNITY_EDITOR");
                 s_StrBld.AppendIndent().AppendLine("\"__Internal\";");
                 s_StrBld.AppendLine("#else");
-                s_StrBld.AppendIndent().AppendLine("\"odininteropcode\";");
+                s_StrBld.AppendIndent().AppendLine("\"OdinInterop\";");
                 s_StrBld.AppendLine("#endif").AppendLine();
                 s_StrBldIndent--;
 
