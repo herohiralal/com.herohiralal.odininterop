@@ -29,6 +29,8 @@ namespace OdinInterop
 		private static void odntrop_OnHotReload(IntPtr libraryHandle)
 		{
 
+			if (libraryHandle == IntPtr.Zero) return;
+
 		}
 
 #else

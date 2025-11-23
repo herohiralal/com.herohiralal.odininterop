@@ -174,7 +174,7 @@ namespace OdinInterop.Editor
                 // generate some delegates
                 foreach (var exportedFn in exportedFns)
                 {
-                    s_StrBld.AppendIndent().Append("public delegate ");
+                    s_StrBld.AppendIndent().Append("private delegate ");
                     s_StrBld.AppendCSharpTypeName(exportedFn.ReturnType, true);
                     s_StrBld.Append($" odntrop_del_{exportedFn.Name}(");
                     var parms = exportedFn.GetParameters();
@@ -192,7 +192,7 @@ namespace OdinInterop.Editor
                     // delegate for the imported setter fn
                     s_StrBld
                         .AppendIndent()
-                        .Append("public delegate void odntrop_del_Set")
+                        .Append("private delegate void odntrop_del_Set")
                         .Append(exportedFn.Name)
                         .Append("Delegate(")
                         .Append("odntrop_del_")
@@ -203,7 +203,7 @@ namespace OdinInterop.Editor
 
                 foreach (var importedFn in importedFns)
                 {
-                    s_StrBld.AppendIndent().Append("public delegate ");
+                    s_StrBld.AppendIndent().Append("private delegate ");
                     s_StrBld.AppendCSharpTypeName(importedFn.ReturnType, true);
                     s_StrBld.Append($" odntrop_del_{importedFn.Name}(");
                     var parms = importedFn.GetParameters();
