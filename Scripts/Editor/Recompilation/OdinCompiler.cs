@@ -15,7 +15,10 @@ namespace OdinInterop.Editor
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Editor", "Debug");
         public static readonly string ODIN_PLUGIN_DIR_PATH = Path.GetFullPath(Path.Combine(Application.dataPath, "Plugins"));
         public static readonly string ODIN_WINDOWS_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "Windows");
-        public static readonly string ODIN_WINDOWS_PLUGIN_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.lib");
+        public static readonly string ODIN_WINDOWS_PLUGIN_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.dll");
+        public static readonly string ODIN_WINDOWS_PLUGIN_EXP_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.exp");
+        public static readonly string ODIN_WINDOWS_PLUGIN_PDB_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.pdb");
+        public static readonly string ODIN_WINDOWS_PLUGIN_STAT_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.lib");
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_PATH = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH,
 #if UNITY_EDITOR_WIN
             "OdinInteropEditor.dll"
@@ -84,7 +87,7 @@ namespace OdinInterop.Editor
             var l = new List<string>
             {
                 $"-out:{ODIN_WINDOWS_PLUGIN_PATH}",
-                "-build-mode:static",
+                "-build-mode:dynamic",
             };
 
             if (!isRelease)
@@ -92,7 +95,11 @@ namespace OdinInterop.Editor
                 l.Add("-debug");
             }
 
-            return RunOdinCompiler(l);
+            var success = RunOdinCompiler(l);
+            if (!success) return false;
+
+            AssetDatabase.Refresh();
+            return true;
         }
 
         private static bool RunOdinCompiler(List<string> args)
@@ -158,11 +165,24 @@ namespace OdinInterop.Editor
 
         public void OnPostprocessBuild(BuildReport report)
         {
+            var l = new List<string>(32);
+
             if (report.summary.platform == BuildTarget.StandaloneWindows64)
             {
-                if (File.Exists(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH)) File.Delete(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH);
-                var meta = OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH + ".meta";
-                if (File.Exists(meta)) File.Delete(meta);
+                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH);
+                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_EXP_PATH);
+                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_PDB_PATH);
+                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_STAT_PATH);
+            }
+
+            foreach (var path in l)
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+
+                var meta = path + ".meta";
+                if (File.Exists(meta))
+                    File.Delete(meta);
             }
         }
     }
