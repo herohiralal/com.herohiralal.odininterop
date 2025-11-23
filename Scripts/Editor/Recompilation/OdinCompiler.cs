@@ -161,6 +161,8 @@ namespace OdinInterop.Editor
             if (report.summary.platform == BuildTarget.StandaloneWindows64)
             {
                 if (File.Exists(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH)) File.Delete(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH);
+                var meta = OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH + ".meta";
+                if (File.Exists(meta)) File.Delete(meta);
             }
         }
     }
