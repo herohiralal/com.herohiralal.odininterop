@@ -1,6 +1,7 @@
 using OdinInterop;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -35,6 +36,12 @@ namespace OdinInterop
 
 #else
 
+		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+		private static void odntrop_RuntimeInit()
+		{
+		}
+
 #endif
+
 	}
 }

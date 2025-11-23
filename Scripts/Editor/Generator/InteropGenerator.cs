@@ -144,6 +144,7 @@ namespace OdinInterop.Editor
                 s_StrBld.AppendLine("using OdinInterop;");
                 s_StrBld.AppendLine("using System;");
                 s_StrBld.AppendLine("using System.Collections.Generic;");
+                s_StrBld.AppendLine("using System.Runtime.InteropServices;");
                 s_StrBld.AppendLine("#if UNITY_EDITOR");
                 s_StrBld.AppendLine("using UnityEditor;");
                 s_StrBld.AppendLine("#endif");
@@ -280,50 +281,6 @@ namespace OdinInterop.Editor
                             .AppendLine(";")
                             .AppendLine();
                     }
-
-                    // wrapper for the user to call
-                    {
-                        s_StrBld
-                            .AppendIndent()
-                            .AppendLine("[GeneratedMethod]")
-                            .AppendIndent()
-                            .Append("public static ")
-                            .AppendCSharpTypeName(importedFn.ReturnType, false)
-                            .Append(" ")
-                            .Append(importedFn.Name)
-                            .Append("(");
-
-                        var parms = importedFn.GetParameters();
-                        for (int i = 0; i < parms.Length; i++)
-                        {
-                            var p = parms[i];
-                            s_StrBld.AppendCSharpTypeName(p.ParameterType, false).Append(' ').Append(p.Name);
-                            if (i < parms.Length - 1)
-                            {
-                                s_StrBld.Append(", ");
-                            }
-                        }
-                        s_StrBld.AppendLine(")");
-                        s_StrBld.AppendIndent().AppendLine("{");
-                        s_StrBldIndent++;
-                        s_StrBld.AppendIndent().Append(importedFn.ReturnType == typeof(void) ? "" : "return ");
-                        s_StrBld.Append("odntrop_delref_");
-                        s_StrBld.Append(importedFn.Name);
-                        s_StrBld.Append("?.Invoke(");
-                        for (int i = 0; i < parms.Length; i++)
-                        {
-                            var p = parms[i];
-                            s_StrBld.Append(p.Name);
-                            if (i < parms.Length - 1)
-                            {
-                                s_StrBld.Append(", ");
-                            }
-                        }
-                        s_StrBld.Append(")").Append(importedFn.ReturnType == typeof(void) ? "" : " ?? default");
-                        s_StrBld.AppendLine(";");
-                        s_StrBldIndent--;
-                        s_StrBld.AppendIndent().AppendLine("}").AppendLine();
-                    }
                 }
 
                 s_StrBld.AppendIndent().AppendLine("[InitializeOnLoadMethod]");
@@ -376,7 +333,135 @@ namespace OdinInterop.Editor
                 // runtime code (bindings)
                 s_StrBld.AppendLine("#else").AppendLine();
 
-                s_StrBld.AppendLine("#endif");
+                // p/invoke declarations for imported functions
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .Append("[DllImport(k_OdinInteropDllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = \"odntrop_export_")
+                        .Append(tyName)
+                        .Append("_")
+                        .Append(importedFn.Name)
+                        .AppendLine("\")]")
+                        .AppendIndent()
+                        .Append("private static extern ")
+                        .AppendCSharpTypeName(importedFn.ReturnType, true)
+                        .Append(" odntrop_delref_")
+                        .Append(importedFn.Name)
+                        .Append("(");
+                    var parms = importedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, true).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(");").AppendLine();
+                }
+
+                // exported function setters
+                foreach (var exportedFn in exportedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .Append("[DllImport(k_OdinInteropDllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = \"odntrop_export_setter_")
+                        .Append(tyName)
+                        .Append("_")
+                        .Append(exportedFn.Name)
+                        .AppendLine("\")]")
+                        .AppendIndent()
+                        .Append("private static extern void odntrop_set_")
+                        .Append(exportedFn.Name)
+                        .Append("(")
+                        .Append("odntrop_del_")
+                        .Append(exportedFn.Name)
+                        .AppendLine(" value);")
+                        .AppendLine();
+                }
+
+                s_StrBld
+                    .AppendIndent()
+                    .AppendLine("[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]")
+                    .AppendIndent()
+                    .AppendLine("private static void odntrop_RuntimeInit()")
+                    .AppendIndent()
+                    .AppendLine("{");
+
+                s_StrBldIndent++;
+
+                foreach (var exportedFn in exportedFns)
+                {
+                    s_StrBld.AppendIndent()
+                        .Append("odntrop_set_")
+                        .Append(exportedFn.Name)
+                        .Append("(")
+                        .Append("odntrop_exported_")
+                        .Append(exportedFn.Name)
+                        .AppendLine(");");
+                }
+
+                s_StrBldIndent--;
+                s_StrBld.AppendIndent().AppendLine("}").AppendLine();
+
+                s_StrBld.AppendLine("#endif").AppendLine();
+
+                // wrapper for the user to call
+                foreach (var importedFn in importedFns)
+                {
+                    s_StrBld
+                        .AppendIndent()
+                        .AppendLine("[GeneratedMethod]")
+                        .AppendIndent()
+                        .Append("public static ")
+                        .AppendCSharpTypeName(importedFn.ReturnType, false)
+                        .Append(" ")
+                        .Append(importedFn.Name)
+                        .Append("(");
+
+                    var parms = importedFn.GetParameters();
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.AppendCSharpTypeName(p.ParameterType, false).Append(' ').Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.AppendLine(")");
+                    s_StrBld.AppendIndent().AppendLine("{");
+                    s_StrBldIndent++;
+                    s_StrBld
+                        .AppendLine("#if UNITY_EDITOR")
+                        .AppendIndent()
+                        .Append("if (odntrop_delref_")
+                        .Append(importedFn.Name)
+                        .Append(" == null) return")
+                        .Append(importedFn.ReturnType == typeof(void) ? "" : " default")
+                        .AppendLine(";")
+                        .AppendLine("#endif");
+
+                    s_StrBld.AppendIndent().Append(importedFn.ReturnType == typeof(void) ? "" : "return ");
+                    s_StrBld.Append("odntrop_delref_");
+                    s_StrBld.Append(importedFn.Name);
+                    s_StrBld.Append("(");
+                    for (int i = 0; i < parms.Length; i++)
+                    {
+                        var p = parms[i];
+                        s_StrBld.Append(p.Name);
+                        if (i < parms.Length - 1)
+                        {
+                            s_StrBld.Append(", ");
+                        }
+                    }
+                    s_StrBld.Append(")").Append(importedFn.ReturnType == typeof(void) ? "" : " ?? default");
+                    s_StrBld.AppendLine(";");
+                    s_StrBldIndent--;
+                    s_StrBld.AppendIndent().AppendLine("}").AppendLine();
+                }
 
                 s_StrBldIndent--;
                 s_StrBld.AppendIndent().AppendLine("}");

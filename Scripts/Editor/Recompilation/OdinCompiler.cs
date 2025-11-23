@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using System.Text;
+using System.Collections.Generic;
 
 namespace OdinInterop.Editor
 {
@@ -12,6 +13,9 @@ namespace OdinInterop.Editor
         private static readonly string ODIN_LIB_INPUT_PATH = InteropGenerator.ODIN_INTEROP_OUT_DIR;
         private static readonly string ODIN_LIB_OUTPUT_DIR_PATH = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "OdinInterop"));
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Editor", "Debug");
+        public static readonly string ODIN_PLUGIN_DIR_PATH = Path.GetFullPath(Path.Combine(Application.dataPath, "Plugins"));
+        public static readonly string ODIN_WINDOWS_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "Windows");
+        public static readonly string ODIN_WINDOWS_PLUGIN_PATH = Path.Combine(ODIN_WINDOWS_PLUGIN_DIR_PATH, "OdinInterop.lib");
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_PATH = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH,
 #if UNITY_EDITOR_WIN
             "OdinInteropEditor.dll"
@@ -44,13 +48,13 @@ namespace OdinInterop.Editor
                 OdinCompilerUtils.RaiseHotReloadEvt(System.IntPtr.Zero);
             }
 
-            if (!CompileOdinInteropLibrary(out var outFile, null, false))
+            if (!CompileOdinInteropLibraryForEditor())
             {
                 Debug.LogError("[OdinCompiler]: Failed to compile OdinInteropEditor library. No active library present.");
                 return;
             }
 
-            var libraryHandle = LibraryUtils.OpenLibrary(outFile);
+            var libraryHandle = LibraryUtils.OpenLibrary(ODIN_LIB_EDITOR_OUTPUT_PATH);
             if (libraryHandle == System.IntPtr.Zero)
             {
                 Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library. No active library present.");
@@ -60,19 +64,39 @@ namespace OdinInterop.Editor
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
 
-        internal static bool CompileOdinInteropLibrary(out string outFile, BuildTargetGroup? tgt, bool isReleaseBuild)
+        internal static bool CompileOdinInteropLibraryForEditor()
         {
-            if (!Directory.Exists(ODIN_LIB_OUTPUT_DIR_PATH))
-                Directory.CreateDirectory(ODIN_LIB_OUTPUT_DIR_PATH);
+            // TODO: rename pdb for windows
+            return RunOdinCompiler(new List<string>
+            {
+                $"-out:{ODIN_LIB_EDITOR_OUTPUT_PATH}",
+                "-build-mode:dynamic",
+                "-debug",
+            });
+        }
 
-            var platformSpecificOutDir = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, tgt?.ToString() ?? "Editor");
-            if (!Directory.Exists(platformSpecificOutDir))
-                Directory.CreateDirectory(platformSpecificOutDir);
+        // assumes windows host
+        internal static bool CompileOdinInteropLibraryForWindows(bool isRelease)
+        {
+            if (!Directory.Exists(ODIN_WINDOWS_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_WINDOWS_PLUGIN_DIR_PATH);
 
-            var outDir = Path.GetFullPath(Path.Combine(platformSpecificOutDir, isReleaseBuild ? "Release" : "Debug"));
-            if (!Directory.Exists(outDir))
-                Directory.CreateDirectory(outDir);
+            var l = new List<string>
+            {
+                $"-out:{ODIN_WINDOWS_PLUGIN_PATH}",
+                "-build-mode:static",
+            };
 
+            if (!isRelease)
+            {
+                l.Add("-debug");
+            }
+
+            return RunOdinCompiler(l);
+        }
+
+        private static bool RunOdinCompiler(List<string> args)
+        {
             var psi = new System.Diagnostics.ProcessStartInfo("odin");
             psi.WorkingDirectory = ODIN_LIB_INPUT_PATH;
             psi.ArgumentList.Clear();
@@ -82,28 +106,12 @@ namespace OdinInterop.Editor
             psi.ArgumentList.Add("-min-link-libs");
             psi.ArgumentList.Add("-use-single-module");
             psi.ArgumentList.Add("-reloc-mode:pic");
+            foreach (var arg in args)
+                psi.ArgumentList.Add(arg);
 
             psi.RedirectStandardOutput = true;
             psi.RedirectStandardError = true;
             psi.UseShellExecute = false;
-
-            if (!tgt.HasValue) // for editor
-            {
-                // no need to specify what platform yay
-
-                outFile = ODIN_LIB_EDITOR_OUTPUT_PATH;
-                psi.ArgumentList.Add($"-out:{outFile}");
-                psi.ArgumentList.Add("-build-mode:dynamic");
-
-                // TODO: rename pdb for windows
-            }
-            else
-            {
-                outFile = "";
-            }
-
-            if (!isReleaseBuild)
-                psi.ArgumentList.Add("-debug");
 
             var process = System.Diagnostics.Process.Start(psi);
             var sb = new StringBuilder(2048);
@@ -133,7 +141,27 @@ namespace OdinInterop.Editor
 
         public void OnPreprocessBuild(BuildReport report)
         {
-            // TODO
+            if (report.summary.platform == BuildTarget.StandaloneWindows64)
+            {
+                var isRelease = !report.summary.options.HasFlag(BuildOptions.Development);
+                if (!OdinCompiler.CompileOdinInteropLibraryForWindows(isRelease))
+                {
+                    throw new BuildFailedException("Failed to compile OdinInterop library for Windows build.");
+                }
+            }
+        }
+    }
+
+    internal class OdinCompilerBuildPostprocessor : IPostprocessBuildWithReport
+    {
+        public int callbackOrder => 0;
+
+        public void OnPostprocessBuild(BuildReport report)
+        {
+            if (report.summary.platform == BuildTarget.StandaloneWindows64)
+            {
+                if (File.Exists(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH)) File.Delete(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH);
+            }
         }
     }
 }
