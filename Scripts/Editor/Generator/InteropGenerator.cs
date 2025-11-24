@@ -89,6 +89,7 @@ namespace OdinInterop.Editor
 
                 s_StrBld
                     .Clear()
+                    .AppendLine("// THIS IS A GENERATED FILE - DO NOT MODIFY OR YOUR CHANGES WILL BE LOST!")
                     .AppendLine("#+vet !tabs !unused !style")
                     .AppendLine("package src")
                     .AppendLine()
