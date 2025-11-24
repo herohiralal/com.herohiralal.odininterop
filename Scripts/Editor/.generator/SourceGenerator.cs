@@ -1,0 +1,530 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace OdinInterop.SourceGenerator
+{
+    [Generator]
+    public class InteropGenerator : ISourceGenerator
+    {
+        public void Initialize(GeneratorInitializationContext ctx)
+        {
+            ctx.RegisterForSyntaxNotifications(() => new Receiver());
+        }
+
+        public void Execute(GeneratorExecutionContext ctx)
+        {
+            if (!(ctx.SyntaxReceiver is Receiver rx)) return;
+
+            var compilation = ctx.Compilation;
+
+            foreach (var classDeclaration in rx.candidateClasses)
+            {
+                var model = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
+                var classSymbol = model.GetDeclaredSymbol(classDeclaration);
+
+                if (classSymbol == null || !IsValidInteropClass(classSymbol))
+                    continue;
+
+                var source = GenerateInteropCode(classSymbol);
+                if (!string.IsNullOrEmpty(source))
+                {
+                    var fileName = $"{classSymbol.Name}.g.cs";
+                    ctx.AddSource(fileName, SourceText.From(source, Encoding.UTF8));
+                }
+            }
+        }
+
+        private static bool IsValidInteropClass(INamedTypeSymbol classSymbol)
+        {
+            // has generate attribute
+            if (!classSymbol.GetAttributes().Any(a => a.AttributeClass?.Name == "GenerateOdinInteropAttribute"))
+                return false;
+
+            // is public+static class
+            if (!classSymbol.IsStatic || classSymbol.DeclaredAccessibility != Accessibility.Public)
+                return false;
+
+            return true;
+        }
+
+        private string GenerateInteropCode(INamedTypeSymbol classSymbol)
+        {
+            var sb = new StringBuilder();
+            var sbIndent = 0;
+
+            var tyName = GetFullTypeName(classSymbol).Replace(".", "___");
+
+            var exportedMethods = classSymbol.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(m => m.MethodKind == MethodKind.Ordinary &&
+                           m.IsStatic &&
+                           m.DeclaredAccessibility == Accessibility.Public &&
+                           !m.Name.StartsWith("odntrop_") &&
+                           !HasGeneratedMethodAttribute(m))
+                .ToList();
+
+            var toImportType = classSymbol.GetTypeMembers("ToImport").FirstOrDefault();
+            var importedMethods = toImportType?.GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(m => m.MethodKind == MethodKind.Ordinary &&
+                           m.IsStatic &&
+                           m.DeclaredAccessibility == Accessibility.Public &&
+                           !m.Name.StartsWith("odntrop_"))
+                .ToList() ?? new List<IMethodSymbol>();
+
+            sb.AppendLine("using OdinInterop;");
+            sb.AppendLine("using System;");
+            sb.AppendLine("using System.Collections.Generic;");
+            sb.AppendLine("using System.Runtime.InteropServices;");
+            sb.AppendLine("#if UNITY_EDITOR");
+            sb.AppendLine("using UnityEditor;");
+            sb.AppendLine("#endif");
+            sb.AppendLine("using UnityEngine;");
+            sb.AppendLine();
+
+            // namespace 
+            if (!string.IsNullOrEmpty(classSymbol.ContainingNamespace?.Name) &&
+                classSymbol.ContainingNamespace.Name != "<global namespace>")
+            {
+                sb.AppendLine($"namespace {classSymbol.ContainingNamespace}");
+                sb.AppendLine("{");
+                sbIndent++;
+            }
+
+            sb.AppendIndent(sbIndent).AppendLine($"public static partial class {classSymbol.Name}");
+            sb.AppendIndent(sbIndent).AppendLine("{");
+            sbIndent++;
+
+            // dll name
+            sb.AppendIndent(sbIndent).AppendLine("private const string k_OdinInteropDllName = ");
+            sbIndent++;
+            sb.AppendLine("#if UNITY_IOS && !UNITY_EDITOR");
+            sb.AppendIndent(sbIndent).AppendLine("\"__Internal\";");
+            sb.AppendLine("#else");
+            sb.AppendIndent(sbIndent).AppendLine("\"OdinInterop\";");
+            sb.AppendLine("#endif");
+            sb.AppendLine();
+            sbIndent--;
+
+            // generate some delegates for exported methods
+            foreach (var method in exportedMethods)
+            {
+                sb.AppendIndent(sbIndent).Append("private delegate ");
+                sb.AppendTypeName(method.ReturnType, true);
+                sb.Append($" odntrop_del_{method.Name}(");
+                AppendParameters(sb, method.Parameters, true);
+                sb.AppendLine(");");
+                sb.AppendLine();
+
+                // Delegate for setter
+                sb.AppendIndent(sbIndent)
+                    .Append("private delegate void odntrop_del_Set")
+                    .Append(method.Name)
+                    .Append("Delegate(odntrop_del_")
+                    .Append(method.Name)
+                    .AppendLine(" value);")
+                    .AppendLine();
+            }
+
+            // generate some delegates for imported methods
+            foreach (var method in importedMethods)
+            {
+                sb.AppendIndent(sbIndent).Append("private delegate ");
+                sb.AppendTypeName(method.ReturnType, true);
+                sb.Append($" odntrop_del_{method.Name}(");
+                AppendParameters(sb, method.Parameters, true);
+                sb.AppendLine(");");
+                sb.AppendLine();
+            }
+
+            // set up p/invoke friendly-wrappers for exported functions
+            foreach (var method in exportedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("[AOT.MonoPInvokeCallback(typeof(odntrop_del_")
+                    .Append(method.Name)
+                    .AppendLine("))]")
+                    .AppendIndent(sbIndent)
+                    .Append("private static ")
+                    .AppendTypeName(method.ReturnType, true)
+                    .Append(" odntrop_exported_")
+                    .Append(method.Name)
+                    .Append("(");
+                AppendParameters(sb, method.Parameters, true);
+                sb.AppendLine(")");
+                sb.AppendIndent(sbIndent).AppendLine("{");
+                sbIndent++;
+
+                sb.AppendIndent(sbIndent);
+                if (!method.ReturnsVoid)
+                    sb.Append("return ");
+                sb.Append(method.Name).Append("(");
+                for (int i = 0; i < method.Parameters.Length; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append(method.Parameters[i].Name);
+                }
+                sb.AppendLine(");");
+
+                sbIndent--;
+                sb.AppendIndent(sbIndent).AppendLine("}");
+                sb.AppendLine();
+            }
+
+            // editor-specific code (hot-reload style)
+            sb.AppendLine("#if UNITY_EDITOR");
+            sb.AppendLine();
+
+            // global var for delegate
+            foreach (var method in importedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("private static odntrop_del_")
+                    .Append(method.Name)
+                    .Append(" odntrop_delref_")
+                    .Append(method.Name)
+                    .AppendLine(";");
+                sb.AppendLine();
+            }
+
+            // editor initialization
+            sb.AppendIndent(sbIndent).AppendLine("[InitializeOnLoadMethod]");
+            sb.AppendIndent(sbIndent).AppendLine("private static void odntrop_EditorInit()");
+            sb.AppendIndent(sbIndent).AppendLine("{");
+            sbIndent++;
+            sb.AppendIndent(sbIndent).AppendLine("OdinCompilerUtils.onHotReload += odntrop_OnHotReload;");
+            sb.AppendIndent(sbIndent).AppendLine("if (OdinCompilerUtils.initialisedAfterDomainReload) odntrop_OnHotReload(OdinCompilerUtils.libraryHandle);");
+            sbIndent--;
+            sb.AppendIndent(sbIndent).AppendLine("}").AppendLine();
+
+            // on hot reload
+            sb.AppendIndent(sbIndent).AppendLine("private static void odntrop_OnHotReload(IntPtr libraryHandle)");
+            sb.AppendIndent(sbIndent).AppendLine("{");
+            sbIndent++;
+
+            // import functions
+            foreach (var method in importedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("odntrop_delref_")
+                    .Append(method.Name)
+                    .Append(" = libraryHandle == IntPtr.Zero ? null : LibraryUtils.GetDelegate<odntrop_del_")
+                    .Append(method.Name)
+                    .Append(">(libraryHandle, \"odntrop_export_")
+                    .Append(tyName)
+                    .Append("_")
+                    .Append(method.Name)
+                    .AppendLine("\");");
+            }
+
+            sb.AppendLine();
+            sb.AppendIndent(sbIndent).AppendLine("if (libraryHandle == IntPtr.Zero) return;");
+            sb.AppendLine();
+
+            // set exported delegates
+            foreach (var method in exportedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("LibraryUtils.GetDelegate<odntrop_del_Set")
+                    .Append(method.Name)
+                    .Append("Delegate>(libraryHandle, \"odntrop_export_setter_")
+                    .Append(tyName)
+                    .Append("_")
+                    .Append(method.Name)
+                    .Append("\")?.Invoke(odntrop_exported_")
+                    .Append(method.Name)
+                    .AppendLine(");");
+            }
+
+            sbIndent--;
+            sb.AppendIndent(sbIndent).AppendLine("}");
+            sb.AppendLine();
+
+            // runtime code (bindings)
+            sb.AppendLine("#else");
+            sb.AppendLine();
+
+            // p/invoke declarations for imported functions
+            foreach (var method in importedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("[DllImport(k_OdinInteropDllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = \"odntrop_export_")
+                    .Append(tyName)
+                    .Append("_")
+                    .Append(method.Name)
+                    .AppendLine("\")]")
+                    .AppendIndent(sbIndent)
+                    .Append("private static extern ")
+                    .AppendTypeName(method.ReturnType, true)
+                    .Append(" odntrop_delref_")
+                    .Append(method.Name)
+                    .Append("(");
+                AppendParameters(sb, method.Parameters, true);
+                sb.AppendLine(");");
+                sb.AppendLine();
+            }
+
+            // exported function setters
+            foreach (var method in exportedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("[DllImport(k_OdinInteropDllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = \"odntrop_export_setter_")
+                    .Append(tyName)
+                    .Append("_")
+                    .Append(method.Name)
+                    .AppendLine("\")]")
+                    .AppendIndent(sbIndent)
+                    .Append("private static extern void odntrop_set_")
+                    .Append(method.Name)
+                    .Append("(odntrop_del_")
+                    .Append(method.Name)
+                    .AppendLine(" value);");
+                sb.AppendLine();
+            }
+
+            // Runtime initialization
+            sb.AppendIndent(sbIndent).AppendLine("[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]");
+            sb.AppendIndent(sbIndent).AppendLine("private static void odntrop_RuntimeInit()");
+            sb.AppendIndent(sbIndent).AppendLine("{");
+            sbIndent++;
+
+            foreach (var method in exportedMethods)
+            {
+                sb.AppendIndent(sbIndent)
+                    .Append("odntrop_set_")
+                    .Append(method.Name)
+                    .Append("(odntrop_exported_")
+                    .Append(method.Name)
+                    .AppendLine(");");
+            }
+
+            sbIndent--;
+            sb.AppendIndent(sbIndent).AppendLine("}");
+            sb.AppendLine();
+
+            sb.AppendLine("#endif");
+            sb.AppendLine();
+
+            // wrapper for the user to call
+            foreach (var method in importedMethods)
+            {
+                sb.AppendIndent(sbIndent).AppendLine("[GeneratedMethod]");
+                sb.AppendIndent(sbIndent)
+                    .Append("public static ")
+                    .AppendTypeName(method.ReturnType, false)
+                    .Append(" ")
+                    .Append(method.Name)
+                    .Append("(");
+                AppendParameters(sb, method.Parameters, false);
+                sb.AppendLine(")");
+                sb.AppendIndent(sbIndent).AppendLine("{");
+                sbIndent++;
+
+                sb.AppendLine("#if UNITY_EDITOR");
+                sb.AppendIndent(sbIndent)
+                    .Append("if (odntrop_delref_")
+                    .Append(method.Name)
+                    .Append(" == null) return")
+                    .Append(method.ReturnsVoid ? "" : " default")
+                    .AppendLine(";");
+                sb.AppendLine("#endif");
+
+                sb.AppendIndent(sbIndent);
+                if (!method.ReturnsVoid)
+                    sb.Append("return ");
+                sb.Append("odntrop_delref_")
+                    .Append(method.Name)
+                    .Append("(");
+                for (int i = 0; i < method.Parameters.Length; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    sb.Append(method.Parameters[i].Name);
+                }
+                sb.Append(")")
+                    .Append(method.ReturnsVoid ? "" : " ?? default")
+                    .AppendLine(";");
+
+                sbIndent--;
+                sb.AppendIndent(sbIndent).AppendLine("}");
+                sb.AppendLine();
+            }
+
+            // close class
+            sbIndent--;
+            sb.AppendIndent(sbIndent).AppendLine("}");
+
+            // close namespace
+            if (!string.IsNullOrEmpty(classSymbol.ContainingNamespace?.Name) &&
+                classSymbol.ContainingNamespace.Name != "<global namespace>")
+            {
+                sbIndent--;
+                sb.AppendLine("}");
+            }
+
+            return sb.ToString();
+        }
+
+        private static void AppendParameters(StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool useInteroperableVersion)
+        {
+            var paramArray = parameters.ToArray();
+            for (int i = 0; i < paramArray.Length; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion);
+                sb.Append(" ");
+                sb.Append(paramArray[i].Name);
+            }
+        }
+
+        public static bool IsUnityObject(ITypeSymbol type)
+        {
+            if (type == null) return false;
+
+            if (GetFullTypeName(type) == "UnityEngine.Object")
+                return true;
+
+            return IsUnityObject(type.BaseType);
+        }
+
+        public static string GetFullTypeName(ISymbol symbol)
+        {
+            if (symbol == null) return string.Empty;
+
+            var parts = new List<string>();
+
+            // build the type name including nested types
+            ISymbol current = symbol;
+            while (current != null && !(current is INamespaceSymbol))
+            {
+                parts.Insert(0, current.Name);
+                current = current.ContainingType;
+            }
+
+            var typeName = string.Join(".", parts);
+
+            // add namespace if present
+            var ns = symbol.ContainingNamespace;
+            if (ns != null && !ns.IsGlobalNamespace)
+            {
+                var nsParts = new List<string>();
+                while (ns != null && !ns.IsGlobalNamespace)
+                {
+                    nsParts.Insert(0, ns.Name);
+                    ns = ns.ContainingNamespace;
+                }
+
+                if (nsParts.Count > 0)
+                {
+                    return string.Join(".", nsParts) + "." + typeName;
+                }
+            }
+
+            return typeName;
+        }
+
+        private bool HasGeneratedMethodAttribute(IMethodSymbol method)
+        {
+            return method.GetAttributes().Any(a => a.AttributeClass?.Name == "GeneratedMethodAttribute");
+        }
+
+        private sealed class Receiver : ISyntaxReceiver
+        {
+            public List<ClassDeclarationSyntax> candidateClasses { get; } = new List<ClassDeclarationSyntax>();
+
+            public void OnVisitSyntaxNode(SyntaxNode syntaxNode)
+            {
+                if (syntaxNode is ClassDeclarationSyntax classDeclaration)
+                {
+                    // any attributes
+                    if (classDeclaration.AttributeLists.Count > 0)
+                    {
+                        // is static
+                        if (classDeclaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
+                        {
+                            candidateClasses.Add(classDeclaration);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static class Extensions
+    {
+        public static StringBuilder AppendIndent(this StringBuilder sb, int indentVal)
+        {
+            for (int i = 0; i < indentVal; i++)
+            {
+                sb.Append('\t');
+            }
+
+            return sb;
+        }
+
+        public static StringBuilder AppendTypeName(this StringBuilder sb, ITypeSymbol type, bool useInteroperableVersion)
+        {
+            var specialType = type.SpecialType;
+
+            string s;
+            switch (specialType)
+            {
+                case SpecialType.System_Void: s = "void"; break;
+                case SpecialType.System_Byte: s = "byte"; break;
+                case SpecialType.System_SByte: s = "sbyte"; break;
+                case SpecialType.System_Int16: s = "short"; break;
+                case SpecialType.System_UInt16: s = "ushort"; break;
+                case SpecialType.System_Int32: s = "int"; break;
+                case SpecialType.System_UInt32: s = "uint"; break;
+                case SpecialType.System_Int64: s = "long"; break;
+                case SpecialType.System_UInt64: s = "ulong"; break;
+                case SpecialType.System_Single: s = "float"; break;
+                case SpecialType.System_Double: s = "double"; break;
+                case SpecialType.System_Boolean: s = "bool"; break;
+                default:
+                    var fullName = InteropGenerator.GetFullTypeName(type);
+
+                    // unity types
+                    if (fullName == "UnityEngine.Vector2") s = "UnityEngine.Vector2";
+                    else if (fullName == "UnityEngine.Vector3") s = "UnityEngine.Vector3";
+                    else if (fullName == "UnityEngine.Vector4") s = "UnityEngine.Vector4";
+                    else if (fullName == "UnityEngine.Quaternion") s = "UnityEngine.Quaternion";
+                    else if (fullName == "UnityEngine.Color") s = "UnityEngine.Color";
+                    else if (type.TypeKind == TypeKind.Enum) // enum
+                    {
+                        s = fullName;
+                    }
+                    else if (InteropGenerator.IsUnityObject(type))
+                    {
+                        s = useInteroperableVersion ? "int" : fullName;
+                    }
+
+                    else if (useInteroperableVersion)
+                    {
+                        s = "odntrop_type_" + fullName.Replace(".", "___");
+                    }
+                    else
+                    {
+                        s = null;
+                    }
+                    break;
+            }
+
+            if (s != null)
+            {
+                sb.Append(s);
+                return sb;
+            }
+            else
+            {
+                sb.Append("#ERROR#");
+                return sb;
+            }
+        }
+    }
+}
