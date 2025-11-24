@@ -4,8 +4,10 @@ using UnityEditor;
 using UnityEditor.Android;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using System;
 using System.Text;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace OdinInterop.Editor
 {
@@ -55,6 +57,8 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_LINUX_OBJ_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
         public static readonly string ODIN_LINUX_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "Linux", "x86_64");
         public static readonly string ODIN_LINUX_PLUGIN_PATH = Path.Combine(ODIN_LINUX_PLUGIN_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_LINUX_SYSROOT_EXTRACT_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "sysroot");
+        public static readonly string ODIN_LINUX_EXECS_EXTRACT_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "execs");
 
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
@@ -233,6 +237,7 @@ namespace OdinInterop.Editor
                         "-Wl,-fini,'_odin_exit_point'",
                         "-Wl,-z,max-page-size=16384", // 16kb pages
                     },
+                    null,
                     ODIN_LIB_INPUT_PATH,
                     null
                 );
@@ -270,6 +275,8 @@ namespace OdinInterop.Editor
             if (Directory.Exists(ODIN_LINUX_OBJ_TEMP_DIR_PATH))
                 Directory.Delete(ODIN_LINUX_OBJ_TEMP_DIR_PATH, true);
             Directory.CreateDirectory(ODIN_LINUX_OBJ_TEMP_DIR_PATH);
+            Directory.CreateDirectory(ODIN_LINUX_SYSROOT_EXTRACT_PATH);
+            Directory.CreateDirectory(ODIN_LINUX_EXECS_EXTRACT_PATH);
 
             var l = new List<string>
             {
@@ -281,6 +288,37 @@ namespace OdinInterop.Editor
 
             var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
             if (!compilationSuccess) return false;
+
+            SetupLinuxSysroot(out var sysrootPath, out var execsPath);
+            return true;
+        }
+
+        private static bool SetupLinuxSysroot(out string sysrootPath, out string execsPath)
+        {
+            sysrootPath = ODIN_LINUX_SYSROOT_EXTRACT_PATH;
+            execsPath = ODIN_LINUX_EXECS_EXTRACT_PATH;
+
+            var sysrootPkg = Path.GetFullPath($"Packages/com.unity.sysroot.linux-x86_64");
+            var arch = RuntimeInformation.OSArchitecture;
+            var isArm = (arch == Architecture.Arm64 || arch == Architecture.Arm);
+
+#if UNITY_EDITOR_WIN
+            var execsPkg = Path.GetFullPath($"Packages/{(isArm ? "com.unity.toolchain.win-arm64-linux-x86_64" : "com.unity.toolchain.win-x86_64-linux-x86_64")}");
+#elif UNITY_EDITOR_LINUX
+            var execsPkg = Path.GetFullPath($"Packages/com.unity.toolchain.linux-x86_64");
+#elif UNITY_EDITOR_OSX
+            var execsPkg = Path.GetFullPath($"Packages/{(isArm ? "com.unity.toolchain.macos-arm64-linux-x86_64" : "com.unity.toolchain.macos-x86_64-linux-x86_64")}");
+#endif
+
+            var sysrootTarBall = Path.Combine(sysrootPkg, "data~", "payload.tar.7z");
+            var execsTarBall = Path.Combine(execsPkg, "data~", "payload.tar.7z");
+
+            var srdecomp = RunTarballDecompressionProcess("Odin Linux Sysroot Decompressor", sysrootTarBall, sysrootPath);
+            if (!srdecomp) return false;
+
+            var exdecomp = RunTarballDecompressionProcess("Odin Linux Execs Decompressor", execsTarBall, execsPath);
+            if (!exdecomp) return false;
+
             return true;
         }
 
@@ -296,10 +334,38 @@ namespace OdinInterop.Editor
             {
                 args.Add("-debug");
             }
-            return RunProcess("OdinCompiler", "odin", args, ODIN_LIB_INPUT_PATH, extraEnv);
+            return RunProcess("OdinCompiler", "odin", args, null, ODIN_LIB_INPUT_PATH, extraEnv);
         }
 
-        private static bool RunProcess(string sn, string tgt, List<string> args, string wd, Dictionary<string, string> extraEnv)
+        private static bool RunTarballDecompressionProcess(string sn, string tarball, string extractPath)
+        {
+#if UNITY_EDITOR_WIN
+            var sevenZipName = "7z.exe";
+#else
+            var sevenZipName = "7za";
+#endif
+            var _7zPath = Path.GetFullPath($"{EditorApplication.applicationContentsPath}/Tools/{sevenZipName}");
+            if (_7zPath.EndsWith("/") || _7zPath.EndsWith("\\"))
+                _7zPath = _7zPath.Substring(0, _7zPath.Length - 1);
+
+            return RunProcess(
+                sn,
+#if UNITY_EDITOR_WIN
+                "cmd",
+                null,
+                $"/c \"\"{_7zPath}\" x -y \"{tarball}\" -so | \"{_7zPath}\" x -y -aoa -ttar -si\"",
+
+#else
+                "/bin/sh",
+                null,
+                $"/c \'\"{_7zPath}\" x -y \"{tarball}\" -so | tar xf - --directory=\"{extractPath}\"\'",
+#endif
+                extractPath,
+                null
+            );
+        }
+
+        private static bool RunProcess(string sn, string tgt, List<string> args, string argsManual, string wd, Dictionary<string, string> extraEnv)
         {
             var psi = new System.Diagnostics.ProcessStartInfo(tgt);
             psi.WorkingDirectory = wd;
@@ -313,8 +379,12 @@ namespace OdinInterop.Editor
             }
 
             psi.ArgumentList.Clear();
-            foreach (var arg in args)
-                psi.ArgumentList.Add(arg);
+            if (args != null)
+                foreach (var arg in args)
+                    psi.ArgumentList.Add(arg);
+
+            if (!string.IsNullOrWhiteSpace(argsManual))
+                psi.Arguments = argsManual;
 
             psi.RedirectStandardOutput = true;
             psi.RedirectStandardError = true;
@@ -336,9 +406,15 @@ namespace OdinInterop.Editor
 
             var s = sb.ToString();
             if (!string.IsNullOrWhiteSpace(s))
-                Debug.LogFormat(success ? LogType.Log : LogType.Error, LogOption.NoStacktrace, null, "[0]: {1}", sn, s);
+                Debug.LogFormat(success ? LogType.Log : LogType.Error, LogOption.NoStacktrace, null, "[{0}]: {1}", sn, s);
 
             return success;
+        }
+
+        [MenuItem("x/x")]
+        private static void TestMenu()
+        {
+            CompileOdinInteropLibraryForLinux(isRelease: false);
         }
     }
 
