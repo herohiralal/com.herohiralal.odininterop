@@ -171,6 +171,7 @@ namespace OdinInterop.Editor
                     "-lm", "-lc",
                     "-Wl,-init,'_odin_entry_point'",
                     "-Wl,-fini,'_odin_exit_point'",
+                    "-Wl,-z,max-page-size=16384", // 16kb pages
                 },
                 ODIN_LIB_INPUT_PATH,
                 null
@@ -302,6 +303,10 @@ namespace OdinInterop.Editor
                 l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_EXP_PATH);
                 l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_PDB_PATH);
                 l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_STAT_PATH);
+            }
+            else if (report.summary.platform == BuildTarget.Android)
+            {
+                l.Add(OdinCompiler.ODIN_ANDROID_PLUGIN_PATH);
             }
 
             foreach (var path in l)
