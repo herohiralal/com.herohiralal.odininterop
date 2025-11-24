@@ -101,8 +101,12 @@ namespace OdinInterop.Editor
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
 
+
         internal static bool CompileOdinInteropLibraryForEditor()
         {
+            if (!Directory.Exists(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH))
+                Directory.CreateDirectory(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH);
+
             // TODO: rename pdb for windows
             return RunOdinCompiler(new List<string>
             {
@@ -151,7 +155,14 @@ namespace OdinInterop.Editor
                 Directory.Delete(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH, true);
             Directory.CreateDirectory(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH);
 
+#if UNITY_ANDROID_API
             var ndkPath = AndroidExternalToolsSettings.ndkRootPath;
+#else
+            var ndkPath = "";
+#endif
+
+            if (string.IsNullOrWhiteSpace(ndkPath))
+                throw new BuildFailedException("Android NDK path could not be determined. Please ensure the Android Build Support module is installed via the Unity Hub.");
 
             var archs = PlayerSettings.Android.targetArchitectures;
             return (!archs.HasFlag(AndroidArchitecture.ARMv7) || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath)) &&
@@ -355,7 +366,17 @@ namespace OdinInterop.Editor
             {
                 args.Add("-debug");
             }
-            return RunProcess("OdinCompiler", "odin", args, null, ODIN_LIB_INPUT_PATH, extraEnv);
+
+            return RunProcess(
+                "OdinCompiler",
+#if UNITY_EDITOR_WIN || UNITY_EDITOR_LINUX
+                "odin",
+#elif UNITY_EDITOR_OSX
+                "/opt/homebrew/bin/odin",
+#else
+                "unknown",
+#endif
+                args, null, ODIN_LIB_INPUT_PATH, extraEnv);
         }
 
         private static bool RunTarballDecompressionProcess(string sn, string tarball, string extractPath)
