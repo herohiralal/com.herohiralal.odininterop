@@ -21,6 +21,8 @@ namespace OdinInterop.Editor
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_PATH = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH,
 #if UNITY_EDITOR_WIN
             "OdinInteropEditor.dll"
+#elif UNITY_EDITOR_OSX
+            "libOdinInteropEditor.dylib"
 #else
             "libOdinInteropEditor.so"
 #endif
@@ -64,8 +66,8 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_OSX_SO_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "OSX");
         public static readonly string ODIN_OSX_ARM64_SO_TEMP_DIR_PATH = Path.Combine(ODIN_OSX_SO_TEMP_DIR_PATH, "arm64");
         public static readonly string ODIN_OSX_X8664_SO_TEMP_DIR_PATH = Path.Combine(ODIN_OSX_SO_TEMP_DIR_PATH, "x86_64");
-        public static readonly string ODIN_OSX_ARM64_SO_PATH = Path.Combine(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH, "libOdinInterop.so");
-        public static readonly string ODIN_OSX_X8664_SO_PATH = Path.Combine(ODIN_OSX_X8664_SO_TEMP_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_OSX_ARM64_SO_PATH = Path.Combine(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH, "libOdinInterop.dylib");
+        public static readonly string ODIN_OSX_X8664_SO_PATH = Path.Combine(ODIN_OSX_X8664_SO_TEMP_DIR_PATH, "libOdinInterop.dylib");
         public static readonly string ODIN_OSX_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "macOS");
         public static readonly string ODIN_OSX_FAT_PLUGIN_PATH = Path.Combine(ODIN_OSX_PLUGIN_DIR_PATH, "libOdinInterop.dylib");
 
