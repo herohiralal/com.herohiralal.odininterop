@@ -71,6 +71,20 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_OSX_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "macOS");
         public static readonly string ODIN_OSX_FAT_PLUGIN_PATH = Path.Combine(ODIN_OSX_PLUGIN_DIR_PATH, "libOdinInterop.dylib");
 
+        // ios
+        public static readonly string ODIN_IOS_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "iOS");
+        public static readonly string ODIN_IOS_OBJ_PATH = Path.Combine(ODIN_IOS_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_IOS_LIB_PATH = Path.Combine(ODIN_IOS_OBJ_TEMP_DIR_PATH, "libOdinInterop.a");
+        public static readonly string ODIN_IOS_SIM_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "iOS_Simulator");
+        public static readonly string ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_IOS_SIM_OBJ_TEMP_DIR_PATH, "arm64");
+        public static readonly string ODIN_IOS_SIM_ARM64_OBJ_PATH = Path.Combine(ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_IOS_SIM_ARM64_LIB_PATH = Path.Combine(ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH, "libOdinInterop.a");
+        public static readonly string ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_IOS_SIM_OBJ_TEMP_DIR_PATH, "x86_64");
+        public static readonly string ODIN_IOS_SIM_X8664_OBJ_PATH = Path.Combine(ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_IOS_SIM_X8664_LIB_PATH = Path.Combine(ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH, "libOdinInterop.a");
+        public static readonly string ODIN_IOS_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "iOS");
+        public static readonly string ODIN_IOS_PLUGIN_PATH = Path.Combine(ODIN_IOS_PLUGIN_DIR_PATH, "libOdinInterop.a");
+
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
         {
@@ -187,6 +201,139 @@ namespace OdinInterop.Editor
             );
         }
 
+        internal static bool CompileOdinInteropLibraryForIOS(bool isRelease)
+        {
+            if (!Directory.Exists(ODIN_IOS_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_IOS_PLUGIN_DIR_PATH);
+
+            var isSimulator = PlayerSettings.iOS.sdkVersion == iOSSdkVersion.SimulatorSDK;
+            if (!isSimulator) // actual device
+            {
+                if (Directory.Exists(ODIN_IOS_OBJ_TEMP_DIR_PATH))
+                    Directory.Delete(ODIN_IOS_OBJ_TEMP_DIR_PATH, true);
+                Directory.CreateDirectory(ODIN_IOS_OBJ_TEMP_DIR_PATH);
+
+                var l = new List<string>
+                {
+                    $"-out:{ODIN_IOS_OBJ_PATH}",
+                    "-target:darwin_arm64",
+                    "-build-mode:object",
+                    "-subtarget:iphone",
+                };
+
+                var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
+                if (!compilationSuccess) return false;
+
+                var archival = RunProcess(
+                    "Odin iOS Archiver",
+                    "ar",
+                    new List<string>
+                    {
+                        "rcs",
+                        ODIN_IOS_LIB_PATH,
+                        ODIN_IOS_OBJ_PATH,
+                    },
+                    null,
+                    ODIN_IOS_OBJ_TEMP_DIR_PATH,
+                    null
+                );
+
+                if (!archival) return false;
+
+                return RunProcess(
+                    "Odin iOS Lipo",
+                    "lipo",
+                    new List<string>
+                    {
+                        "-create",
+                        "-output", ODIN_IOS_PLUGIN_PATH,
+                        ODIN_IOS_LIB_PATH,
+                    },
+                    null, ODIN_IOS_OBJ_TEMP_DIR_PATH,
+                    null
+                );
+            }
+            else
+            {
+                if (Directory.Exists(ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH))
+                    Directory.Delete(ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH, true);
+                Directory.CreateDirectory(ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH);
+
+                if (Directory.Exists(ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH))
+                    Directory.Delete(ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH, true);
+                Directory.CreateDirectory(ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH);
+
+                var arm64L = new List<string>
+                {
+                    $"-out:{ODIN_IOS_SIM_ARM64_OBJ_PATH}",
+                    "-target:darwin_arm64",
+                    "-build-mode:object",
+                    "-subtarget:iphonesimulator",
+                };
+
+                var arm64CompilationSuccess = RunOdinCompiler(arm64L, isRelease: isRelease);
+                if (!arm64CompilationSuccess) return false;
+
+                var x8664L = new List<string>
+                {
+                    $"-out:{ODIN_IOS_SIM_X8664_OBJ_PATH}",
+                    "-target:darwin_amd64",
+                    "-build-mode:object",
+                    "-subtarget:iphonesimulator",
+                };
+
+                var x8664CompilationSuccess = RunOdinCompiler(x8664L, isRelease: isRelease);
+                if (!x8664CompilationSuccess) return false;
+
+                var arm64Archival = RunProcess(
+                    "Odin iOS Simulator ARM64 Archiver",
+                    "ar",
+                    new List<string>
+                    {
+                        "rcs",
+                        ODIN_IOS_SIM_ARM64_LIB_PATH,
+                        ODIN_IOS_SIM_ARM64_OBJ_PATH,
+                    },
+                    null,
+                    ODIN_IOS_SIM_ARM64_OBJ_TEMP_DIR_PATH,
+                    null
+                );
+
+                if (!arm64Archival) return false;
+
+                var x8664Archival = RunProcess(
+                    "Odin iOS Simulator x86_64 Archiver",
+                    "ar",
+                    new List<string>
+                    {
+                        "rcs",
+                        ODIN_IOS_SIM_X8664_LIB_PATH,
+                        ODIN_IOS_SIM_X8664_OBJ_PATH,
+                    },
+                    null,
+                    ODIN_IOS_SIM_X8664_OBJ_TEMP_DIR_PATH,
+                    null
+                );
+
+                if (!x8664Archival) return false;
+
+                return RunProcess(
+                    "Odin iOS Simulator Lipo",
+                    "lipo",
+                    new List<string>
+                    {
+                        "-create",
+                        "-output", ODIN_IOS_PLUGIN_PATH,
+                        ODIN_IOS_SIM_ARM64_LIB_PATH,
+                        ODIN_IOS_SIM_X8664_LIB_PATH,
+                    },
+                    null,
+                    ODIN_IOS_SIM_OBJ_TEMP_DIR_PATH,
+                    null
+                );
+            }
+        }
+
         internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease)
         {
             if (!Directory.Exists(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH))
@@ -255,7 +402,6 @@ namespace OdinInterop.Editor
                     $"-target:{odnPlatform}",
                     // "-subtarget:android", armv7/x64 aren't supported by odin so trying it out without that stuff
                     "-build-mode:object",
-                    "-no-entry-point",
                 };
 
                 var d = new Dictionary<string, string>
@@ -543,6 +689,17 @@ namespace OdinInterop.Editor
                     throw new BuildFailedException("Failed to compile OdinInterop library for macOS build.");
                 }
             }
+            else if (report.summary.platform == BuildTarget.iOS)
+            {
+                if (!OdinCompiler.CompileOdinInteropLibraryForIOS(isRelease))
+                {
+                    throw new BuildFailedException("Failed to compile OdinInterop library for iOS build.");
+                }
+            }
+            else
+            {
+                throw new BuildFailedException($"OdinInterop does not support builds for platform: {report.summary.platform}.");
+            }
         }
     }
 
@@ -570,6 +727,14 @@ namespace OdinInterop.Editor
             else if (report.summary.platform == BuildTarget.StandaloneLinux64)
             {
                 l.Add(OdinCompiler.ODIN_LINUX_PLUGIN_PATH);
+            }
+            else if (report.summary.platform == BuildTarget.StandaloneOSX)
+            {
+                l.Add(OdinCompiler.ODIN_OSX_FAT_PLUGIN_PATH);
+            }
+            else if (report.summary.platform == BuildTarget.iOS)
+            {
+                l.Add(OdinCompiler.ODIN_IOS_PLUGIN_PATH);
             }
 
             foreach (var path in l)
