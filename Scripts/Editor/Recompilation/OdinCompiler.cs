@@ -400,7 +400,7 @@ namespace OdinInterop.Editor
 #else
                 "/bin/sh",
                 null,
-                $"/c \'\"{_7zPath}\" x -y \"{tarball}\" -so | tar xf - --directory=\"{extractPath}\"\'",
+                $"-c \'\"{_7zPath}\" x -y \"{tarball}\" -so | tar xf - --directory=\"{extractPath}\"\'",
 #endif
                 extractPath,
                 null
@@ -451,12 +451,6 @@ namespace OdinInterop.Editor
                 Debug.LogFormat(success ? LogType.Log : LogType.Error, LogOption.NoStacktrace, null, "[{0}]: {1}", sn, s);
 
             return success;
-        }
-
-        [MenuItem("x/x")]
-        private static void TestMenu()
-        {
-            CompileOdinInteropLibraryForLinux(isRelease: false);
         }
     }
 
