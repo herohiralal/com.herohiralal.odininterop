@@ -6,7 +6,7 @@ namespace OdinInterop
 {
     public static class LibraryUtils
     {
-#if UNITY_EDITOR_OSX || UNITY_STANDALONE_OSX || UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX))
 
         private const int RTLD_NOLOAD = 0x4;
 
@@ -40,7 +40,7 @@ namespace OdinInterop
                 : Marshal.GetDelegateForFunctionPointer(symbol, typeof(T)) as T;
         }
 
-#elif UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+#elif UNITY_EDITOR_WIN || (!UNITY_EDITOR && UNITY_STANDALONE_WIN)
 
         [DllImport("kernel32")]
         private static extern IntPtr LoadLibrary(string path);
