@@ -72,16 +72,17 @@ namespace OdinInterop.Editor
                 LibraryUtils.CloseLibraryIfLoaded(ODIN_LIB_EDITOR_OUTPUT_PATH);
             }
 
+            InteropGenerator.GenerateInteropCode();
             HotReload();
         }
 
         [MenuItem("Tools/Odin Interop/Hot Reload %&R")]
         public static void HotReload()
         {
-            if (OdinCompilerUtils.libraryHandle != System.IntPtr.Zero)
+            if (OdinCompilerUtils.libraryHandle != IntPtr.Zero)
             {
                 LibraryUtils.CloseLibrary(OdinCompilerUtils.libraryHandle);
-                OdinCompilerUtils.RaiseHotReloadEvt(System.IntPtr.Zero);
+                OdinCompilerUtils.RaiseHotReloadEvt(IntPtr.Zero);
             }
 
             if (!CompileOdinInteropLibraryForEditor())
@@ -91,7 +92,7 @@ namespace OdinInterop.Editor
             }
 
             var libraryHandle = LibraryUtils.OpenLibrary(ODIN_LIB_EDITOR_OUTPUT_PATH);
-            if (libraryHandle == System.IntPtr.Zero)
+            if (libraryHandle == IntPtr.Zero)
             {
                 Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library. No active library present.");
                 return;
