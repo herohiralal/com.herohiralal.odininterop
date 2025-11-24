@@ -50,6 +50,12 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_ANDROID_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
         public static readonly string ODIN_ANDROID_X8664_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH, "libOdinInterop.so");
 
+        // linux
+        public static readonly string ODIN_LINUX_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Linux");
+        public static readonly string ODIN_LINUX_OBJ_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_LINUX_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "Linux", "x86_64");
+        public static readonly string ODIN_LINUX_PLUGIN_PATH = Path.Combine(ODIN_LINUX_PLUGIN_DIR_PATH, "libOdinInterop.so");
+
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
         {
@@ -254,6 +260,28 @@ namespace OdinInterop.Editor
                     default: return "21"; // default to 21 if unknown
                 }
             }
+        }
+
+        internal static bool CompileOdinInteropLibraryForLinux(bool isRelease)
+        {
+            if (!Directory.Exists(ODIN_LINUX_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_LINUX_PLUGIN_DIR_PATH);
+
+            if (Directory.Exists(ODIN_LINUX_OBJ_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_LINUX_OBJ_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_LINUX_OBJ_TEMP_DIR_PATH);
+
+            var l = new List<string>
+            {
+                $"-out:{ODIN_LINUX_OBJ_PATH}",
+                $"-target:linux_amd64",
+                "-build-mode:object",
+                "-no-entry-point",
+            };
+
+            var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
+            if (!compilationSuccess) return false;
+            return true;
         }
 
         private static bool RunOdinCompiler(List<string> args, Dictionary<string, string> extraEnv = null, bool isRelease = false)
