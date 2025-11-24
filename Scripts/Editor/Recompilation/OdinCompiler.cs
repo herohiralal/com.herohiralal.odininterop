@@ -289,8 +289,28 @@ namespace OdinInterop.Editor
             var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
             if (!compilationSuccess) return false;
 
-            SetupLinuxSysroot(out var sysrootPath, out var execsPath);
-            return true;
+            if (!SetupLinuxSysroot(out var sysrootPath, out var execsPath))
+            {
+                Debug.LogError("[OdinCompiler]: Failed to setup Linux sysroot and execs for OdinInterop compilation.");
+                return false;
+            }
+
+            return RunProcess(
+                "Odin Linux Linker",
+                Path.Combine(execsPath, "bin", "clang++"),
+                new List<string>
+                {
+                    $"--sysroot={sysrootPath}",
+                    $"--target=x86_64-glibc2.17-linux-gnu",
+                    "-shared",
+                    "-o", ODIN_LINUX_PLUGIN_PATH,
+                    ODIN_LINUX_OBJ_PATH,
+                    $"-fuse-ld={Path.Combine(execsPath, "bin", "ld.lld")}",
+                },
+                null,
+                ODIN_LIB_INPUT_PATH,
+                null
+            );
         }
 
         private static bool SetupLinuxSysroot(out string sysrootPath, out string execsPath)
@@ -410,12 +430,6 @@ namespace OdinInterop.Editor
 
             return success;
         }
-
-        [MenuItem("x/x")]
-        private static void TestMenu()
-        {
-            CompileOdinInteropLibraryForLinux(isRelease: false);
-        }
     }
 
     internal class OdinCompilerBuildPreprocessor : IPreprocessBuildWithReport
@@ -438,6 +452,13 @@ namespace OdinInterop.Editor
                 if (!OdinCompiler.CompileOdinInteropLibraryForAndroid(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for Android build.");
+                }
+            }
+            else if (report.summary.platform == BuildTarget.StandaloneLinux64)
+            {
+                if (!OdinCompiler.CompileOdinInteropLibraryForLinux(isRelease))
+                {
+                    throw new BuildFailedException("Failed to compile OdinInterop library for Linux build.");
                 }
             }
         }
@@ -463,6 +484,10 @@ namespace OdinInterop.Editor
                 l.Add(OdinCompiler.ODIN_ANDROID_ARMv7_PLUGIN_PATH);
                 l.Add(OdinCompiler.ODIN_ANDROID_ARMv8_PLUGIN_PATH);
                 l.Add(OdinCompiler.ODIN_ANDROID_X8664_PLUGIN_PATH);
+            }
+            else if (report.summary.platform == BuildTarget.StandaloneLinux64)
+            {
+                l.Add(OdinCompiler.ODIN_LINUX_PLUGIN_PATH);
             }
 
             foreach (var path in l)
