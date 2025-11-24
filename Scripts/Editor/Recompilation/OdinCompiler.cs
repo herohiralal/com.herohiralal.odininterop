@@ -60,6 +60,15 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_LINUX_SYSROOT_EXTRACT_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "sysroot");
         public static readonly string ODIN_LINUX_EXECS_EXTRACT_PATH = Path.Combine(ODIN_LINUX_OBJ_TEMP_DIR_PATH, "execs");
 
+        // macos
+        public static readonly string ODIN_OSX_SO_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "OSX");
+        public static readonly string ODIN_OSX_ARM64_SO_TEMP_DIR_PATH = Path.Combine(ODIN_OSX_SO_TEMP_DIR_PATH, "arm64");
+        public static readonly string ODIN_OSX_X8664_SO_TEMP_DIR_PATH = Path.Combine(ODIN_OSX_SO_TEMP_DIR_PATH, "x86_64");
+        public static readonly string ODIN_OSX_ARM64_SO_PATH = Path.Combine(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_OSX_X8664_SO_PATH = Path.Combine(ODIN_OSX_X8664_SO_TEMP_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_OSX_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "macOS");
+        public static readonly string ODIN_OSX_FAT_PLUGIN_PATH = Path.Combine(ODIN_OSX_PLUGIN_DIR_PATH, "libOdinInterop.dylib");
+
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
         {
@@ -127,11 +136,53 @@ namespace OdinInterop.Editor
                 "-build-mode:dynamic",
             };
 
-            var success = RunOdinCompiler(l, isRelease: isRelease);
-            if (!success) return false;
+            return RunOdinCompiler(l, isRelease: isRelease);
+        }
 
-            AssetDatabase.Refresh();
-            return true;
+        internal static bool CompileOdinInteropLibraryForMacOS(bool isRelease)
+        {
+            if (!Directory.Exists(ODIN_OSX_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_OSX_PLUGIN_DIR_PATH);
+
+            if (Directory.Exists(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_OSX_ARM64_SO_TEMP_DIR_PATH);
+
+            if (Directory.Exists(ODIN_OSX_X8664_SO_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_OSX_X8664_SO_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_OSX_X8664_SO_TEMP_DIR_PATH);
+
+            var arm64Success = RunOdinCompiler(new List<string>
+            {
+                $"-out:{ODIN_OSX_ARM64_SO_PATH}",
+                "-target:darwin_arm64",
+                "-build-mode:dynamic",
+            }, isRelease: isRelease);
+
+            var x8664Success = RunOdinCompiler(new List<string>
+            {
+                $"-out:{ODIN_OSX_X8664_SO_PATH}",
+                "-target:darwin_amd64",
+                "-build-mode:dynamic",
+            }, isRelease: isRelease);
+
+            if (!arm64Success || !x8664Success) return false;
+
+            // now create fat binary
+            return RunProcess(
+                "Odin macOS Fat Binary Creator",
+                "lipo",
+                new List<string>
+                {
+                    "-create",
+                    "-output", ODIN_OSX_FAT_PLUGIN_PATH,
+                    ODIN_OSX_ARM64_SO_PATH,
+                    ODIN_OSX_X8664_SO_PATH,
+                },
+                null,
+                ODIN_OSX_SO_TEMP_DIR_PATH,
+                null
+            );
         }
 
         internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease)
@@ -481,6 +532,13 @@ namespace OdinInterop.Editor
                 if (!OdinCompiler.CompileOdinInteropLibraryForLinux(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for Linux build.");
+                }
+            }
+            else if (report.summary.platform == BuildTarget.StandaloneOSX)
+            {
+                if (!OdinCompiler.CompileOdinInteropLibraryForMacOS(isRelease))
+                {
+                    throw new BuildFailedException("Failed to compile OdinInterop library for macOS build.");
                 }
             }
         }
