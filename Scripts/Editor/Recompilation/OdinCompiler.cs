@@ -430,6 +430,12 @@ namespace OdinInterop.Editor
 
             return success;
         }
+
+        [MenuItem("x/x")]
+        private static void TestMenu()
+        {
+            CompileOdinInteropLibraryForLinux(isRelease: false);
+        }
     }
 
     internal class OdinCompilerBuildPreprocessor : IPreprocessBuildWithReport
