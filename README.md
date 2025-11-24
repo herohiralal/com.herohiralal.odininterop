@@ -28,11 +28,11 @@ This is where Odin makes for an ideal solution. Fast compile times, bunch of mod
 
 Below are the currently supported platforms:
 
-- [ ] Editor Experience
+- [x] Editor Experience
   - [x] Hot reloading outside PlayMode (with rebinding)
   - [x] Hot reloading inside PlayMode (with dynamic rebinding)
   - [x] Unity domain-reload compatibility
-  - [ ] BindGen* (current version supports a manual `MenuItem` based trigger; would like to replace it with Roslyn Source Generators)
+  - [x] Roslyn Source-Generator based BindGen
 - [ ] Platform Support
   - [x] Windows
   - [ ] macOS
