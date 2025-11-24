@@ -36,9 +36,19 @@ namespace OdinInterop.Editor
 
         // android
         public static readonly string ODIN_ANDROID_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Android");
-        public static readonly string ODIN_ANDROID_OBJ_PATH = Path.Combine(ODIN_ANDROID_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_ANDROID_ARMv7_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_ANDROID_OBJ_TEMP_DIR_PATH, "armv7");
+        public static readonly string ODIN_ANDROID_ARMv8_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_ANDROID_OBJ_TEMP_DIR_PATH, "armv8");
+        public static readonly string ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_ANDROID_OBJ_TEMP_DIR_PATH, "x86_64");
+        public static readonly string ODIN_ANDROID_ARMv7_OBJ_PATH = Path.Combine(ODIN_ANDROID_ARMv7_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_ANDROID_ARMv8_OBJ_PATH = Path.Combine(ODIN_ANDROID_ARMv8_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
+        public static readonly string ODIN_ANDROID_X8664_OBJ_PATH = Path.Combine(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH, "OdinInterop.o");
         public static readonly string ODIN_ANDROID_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "Android");
-        public static readonly string ODIN_ANDROID_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "armv7");
+        public static readonly string ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "aarch64");
+        public static readonly string ODIN_ANDROID_X8664_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "x86_64");
+        public static readonly string ODIN_ANDROID_ARMv7_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_ANDROID_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_ANDROID_X8664_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH, "libOdinInterop.so");
 
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
@@ -111,71 +121,116 @@ namespace OdinInterop.Editor
 
         internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease)
         {
-            if (!Directory.Exists(ODIN_ANDROID_PLUGIN_DIR_PATH))
-                Directory.CreateDirectory(ODIN_ANDROID_PLUGIN_DIR_PATH);
+            if (!Directory.Exists(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH);
+            if (!Directory.Exists(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH);
+            if (!Directory.Exists(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH))
+                Directory.CreateDirectory(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH);
 
-            if (Directory.Exists(ODIN_ANDROID_OBJ_TEMP_DIR_PATH))
-                Directory.Delete(ODIN_ANDROID_OBJ_TEMP_DIR_PATH, true);
+            if (Directory.Exists(ODIN_ANDROID_ARMv7_OBJ_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_ANDROID_ARMv7_OBJ_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_ANDROID_ARMv7_OBJ_TEMP_DIR_PATH);
 
-            Directory.CreateDirectory(ODIN_ANDROID_OBJ_TEMP_DIR_PATH);
+            if (Directory.Exists(ODIN_ANDROID_ARMv8_OBJ_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_ANDROID_ARMv8_OBJ_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_ANDROID_ARMv8_OBJ_TEMP_DIR_PATH);
 
-            var l = new List<string>
-            {
-                $"-out:{ODIN_ANDROID_OBJ_PATH}",
-                "-target:linux_arm64",
-                "-subtarget:android",
-                "-build-mode:object",
-                "-no-entry-point",
-            };
+            if (Directory.Exists(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH))
+                Directory.Delete(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH, true);
+            Directory.CreateDirectory(ODIN_ANDROID_X8664_OBJ_TEMP_DIR_PATH);
 
             var ndkPath = AndroidExternalToolsSettings.ndkRootPath;
-            var d = new Dictionary<string, string>
+
+            var archs = PlayerSettings.Android.targetArchitectures;
+            return (!archs.HasFlag(AndroidArchitecture.ARMv7) || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath)) &&
+                   (!archs.HasFlag(AndroidArchitecture.ARM64) || CompileForArch(AndroidArchitecture.ARM64, isRelease, ndkPath)) &&
+                   (!archs.HasFlag(AndroidArchitecture.X86_64) || CompileForArch(AndroidArchitecture.X86_64, isRelease, ndkPath));
+
+            static bool CompileForArch(AndroidArchitecture arch, bool isRelease, string ndkPath)
             {
-                { "ODIN_ANDROID_NDK", ndkPath }
-            };
+                string objPath, outPath, androidNdkPathThing, odnPlatform;
+                switch (arch)
+                {
+                    case AndroidArchitecture.ARMv7:
+                        objPath = ODIN_ANDROID_ARMv7_OBJ_PATH;
+                        outPath = ODIN_ANDROID_ARMv7_PLUGIN_PATH;
+                        androidNdkPathThing = "armv7a";
+                        odnPlatform = "linux_arm32";
+                        break;
+                    case AndroidArchitecture.ARM64:
+                        objPath = ODIN_ANDROID_ARMv8_OBJ_PATH;
+                        outPath = ODIN_ANDROID_ARMv8_PLUGIN_PATH;
+                        androidNdkPathThing = "aarch64";
+                        odnPlatform = "linux_arm64";
+                        break;
+                    case AndroidArchitecture.X86_64:
+                        objPath = ODIN_ANDROID_X8664_OBJ_PATH;
+                        outPath = ODIN_ANDROID_X8664_PLUGIN_PATH;
+                        androidNdkPathThing = "x86_64";
+                        odnPlatform = "linux_amd64";
+                        break;
+                    default:
+                        throw new BuildFailedException($"Unsupported Android architecture for OdinInterop: {arch}");
+                }
 
-            var compilationSuccess = RunOdinCompiler(l, extraEnv: d, isRelease: isRelease);
-            if (!compilationSuccess) return false;
+                var l = new List<string>
+                {
+                    $"-out:{objPath}",
+                    $"-target:{odnPlatform}",
+                    // "-subtarget:android", armv7/x64 aren't supported by odin so trying it out without that stuff
+                    "-build-mode:object",
+                    "-no-entry-point",
+                };
 
-            const string PLT_TOOLCHAIN_NAME =
+                var d = new Dictionary<string, string>
+                {
+                    { "ODIN_ANDROID_NDK", ndkPath }
+                };
+
+                var compilationSuccess = RunOdinCompiler(l, extraEnv: d, isRelease: isRelease);
+                if (!compilationSuccess) return false;
+
+                const string PLT_TOOLCHAIN_NAME =
 #if UNITY_EDITOR_WIN
-                "windows-x86_64";
+                    "windows-x86_64";
 #elif UNITY_EDITOR_OSX
-                "darwin-x86_64";
+                    "darwin-x86_64";
 #elif UNITY_EDITOR_LINUX
-                "linux-x86_64";
+                    "linux-x86_64";
 #else
-                "unknown";
+                    "unknown";  
 #endif
 
-            // now link to a shared lib
-            return RunProcess(
-                "Odin Android Linker",
-                Path.Combine(
-                    ndkPath,
-                    "toolchains",
-                    "llvm",
-                    "prebuilt",
-                    PLT_TOOLCHAIN_NAME,
-                    "bin",
-                    "clang"),
-                new List<string>
-                {
-                    $"--target=aarch64-linux-android{GetAndroidVersionStr()}",
-                    "-shared",
-                    "-o", ODIN_ANDROID_PLUGIN_PATH,
-                    ODIN_ANDROID_OBJ_PATH,
-                    $"-L{Path.Combine(ndkPath, "toolchains", "llvm", "prebuilt", PLT_TOOLCHAIN_NAME, "sysroot", "usr", "lib", "aarch64-linux-android", GetAndroidVersionStr())}",
-                    "-landroid", "-llog",
-                    $"--sysroot={Path.Combine(ndkPath, "toolchains", "llvm", "prebuilt", PLT_TOOLCHAIN_NAME, "sysroot")}",
-                    "-lm", "-lc",
-                    "-Wl,-init,'_odin_entry_point'",
-                    "-Wl,-fini,'_odin_exit_point'",
-                    "-Wl,-z,max-page-size=16384", // 16kb pages
-                },
-                ODIN_LIB_INPUT_PATH,
-                null
-            );
+                // now link to a shared lib
+                return RunProcess(
+                    "Odin Android Linker",
+                    Path.Combine(
+                        ndkPath,
+                        "toolchains",
+                        "llvm",
+                        "prebuilt",
+                        PLT_TOOLCHAIN_NAME,
+                        "bin",
+                        "clang"),
+                    new List<string>
+                    {
+                        $"--target={androidNdkPathThing}-linux-android{GetAndroidVersionStr()}",
+                        "-shared",
+                        "-o", outPath,
+                        objPath,
+                        $"-L{Path.Combine(ndkPath, "toolchains", "llvm", "prebuilt", PLT_TOOLCHAIN_NAME, "sysroot", "usr", "lib", $"{androidNdkPathThing}-linux-android", GetAndroidVersionStr())}",
+                        "-landroid", "-llog",
+                        $"--sysroot={Path.Combine(ndkPath, "toolchains", "llvm", "prebuilt", PLT_TOOLCHAIN_NAME, "sysroot")}",
+                        "-lm", "-lc",
+                        "-Wl,-init,'_odin_entry_point'",
+                        "-Wl,-fini,'_odin_exit_point'",
+                        "-Wl,-z,max-page-size=16384", // 16kb pages
+                    },
+                    ODIN_LIB_INPUT_PATH,
+                    null
+                );
+            }
 
             static string GetAndroidVersionStr()
             {
@@ -276,11 +331,6 @@ namespace OdinInterop.Editor
             }
             else if (report.summary.platform == BuildTarget.Android)
             {
-                if (PlayerSettings.Android.targetArchitectures != AndroidArchitecture.ARM64)
-                {
-                    throw new BuildFailedException("OdinInterop Android build target only supports ARM64 architecture.");
-                }
-
                 if (!OdinCompiler.CompileOdinInteropLibraryForAndroid(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for Android build.");
@@ -306,7 +356,9 @@ namespace OdinInterop.Editor
             }
             else if (report.summary.platform == BuildTarget.Android)
             {
-                l.Add(OdinCompiler.ODIN_ANDROID_PLUGIN_PATH);
+                l.Add(OdinCompiler.ODIN_ANDROID_ARMv7_PLUGIN_PATH);
+                l.Add(OdinCompiler.ODIN_ANDROID_ARMv8_PLUGIN_PATH);
+                l.Add(OdinCompiler.ODIN_ANDROID_X8664_PLUGIN_PATH);
             }
 
             foreach (var path in l)
