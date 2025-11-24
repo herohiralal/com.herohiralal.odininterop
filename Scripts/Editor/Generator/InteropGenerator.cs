@@ -14,7 +14,6 @@ namespace OdinInterop.Editor
         internal static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
 
         private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256); // to create in odin
-        private static HashSet<Type> s_ImportedTypes = new HashSet<Type>(256); // to create interoperable proxies in C#
 
         internal static void GenerateInteropCode()
         {
@@ -73,8 +72,6 @@ namespace OdinInterop.Editor
 
         private static void GenerateInteropCodeInternal(Type t, bool isEngineCode)
         {
-            s_ImportedTypes.Clear();
-
             string asmName = t.Assembly.GetName().Name;
 
             var tyName = t.FullName.Replace('+', '.').Replace(".", "___");
@@ -341,6 +338,7 @@ namespace OdinInterop.Editor
             else
             {
                 sb.Append(resolvedName);
+                s_ExportedTypes.Add(t);
             }
 
             return sb;
