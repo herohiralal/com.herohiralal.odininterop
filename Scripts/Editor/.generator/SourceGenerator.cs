@@ -23,6 +23,7 @@ namespace OdinInterop.SourceGenerator
 
             var compilation = ctx.Compilation;
 
+            var sb = new StringBuilder();
             foreach (var classDeclaration in rx.candidateClasses)
             {
                 var model = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
@@ -31,12 +32,14 @@ namespace OdinInterop.SourceGenerator
                 if (classSymbol == null || !IsValidInteropClass(classSymbol))
                     continue;
 
-                var source = GenerateInteropCode(classSymbol);
-                if (!string.IsNullOrEmpty(source))
+                sb.Clear();
+                GenerateInteropCode(sb, classSymbol);
+                if (sb.Length != 0)
                 {
                     var fileName = $"{classSymbol.Name}.g.cs";
-                    ctx.AddSource(fileName, SourceText.From(source, Encoding.UTF8));
+                    ctx.AddSource(fileName, SourceText.From(sb.ToString(), Encoding.UTF8));
                 }
+                sb.Clear();
             }
         }
 
@@ -53,12 +56,11 @@ namespace OdinInterop.SourceGenerator
             return true;
         }
 
-        private string GenerateInteropCode(INamedTypeSymbol classSymbol)
+        private void GenerateInteropCode(StringBuilder sb, INamedTypeSymbol classSymbol)
         {
-            var sb = new StringBuilder();
             var sbIndent = 0;
 
-            var tyName = GetFullTypeName(classSymbol).Replace(".", "___");
+            var tyName = classSymbol.GetFullTypeName().Replace(".", "___");
 
             var exportedMethods = classSymbol.GetMembers()
                 .OfType<IMethodSymbol>()
@@ -66,7 +68,7 @@ namespace OdinInterop.SourceGenerator
                            m.IsStatic &&
                            m.DeclaredAccessibility == Accessibility.Public &&
                            !m.Name.StartsWith("odntrop_") &&
-                           !HasGeneratedMethodAttribute(m))
+                           !m.HasGeneratedMethodAttribute())
                 .ToList();
 
             var toImportType = classSymbol.GetTypeMembers("ToImport").FirstOrDefault();
@@ -118,7 +120,7 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent).Append("private delegate ");
                 sb.AppendTypeName(method.ReturnType, true);
                 sb.Append($" odntrop_del_{method.Name}(");
-                AppendParameters(sb, method.Parameters, true);
+                sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(");");
                 sb.AppendLine();
 
@@ -138,7 +140,7 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent).Append("private delegate ");
                 sb.AppendTypeName(method.ReturnType, true);
                 sb.Append($" odntrop_del_{method.Name}(");
-                AppendParameters(sb, method.Parameters, true);
+                sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(");");
                 sb.AppendLine();
             }
@@ -156,7 +158,7 @@ namespace OdinInterop.SourceGenerator
                     .Append(" odntrop_exported_")
                     .Append(method.Name)
                     .Append("(");
-                AppendParameters(sb, method.Parameters, true);
+                sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(")");
                 sb.AppendIndent(sbIndent).AppendLine("{");
                 sbIndent++;
@@ -265,7 +267,7 @@ namespace OdinInterop.SourceGenerator
                     .Append(" odntrop_delref_")
                     .Append(method.Name)
                     .Append("(");
-                AppendParameters(sb, method.Parameters, true);
+                sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(");");
                 sb.AppendLine();
             }
@@ -288,7 +290,7 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendLine();
             }
 
-            // Runtime initialization
+            // runtime initialization
             sb.AppendIndent(sbIndent).AppendLine("[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]");
             sb.AppendIndent(sbIndent).AppendLine("private static void odntrop_RuntimeInit()");
             sb.AppendIndent(sbIndent).AppendLine("{");
@@ -321,7 +323,7 @@ namespace OdinInterop.SourceGenerator
                     .Append(" ")
                     .Append(method.Name)
                     .Append("(");
-                AppendParameters(sb, method.Parameters, false);
+                sb.AppendParameters(method.Parameters, false);
                 sb.AppendLine(")");
                 sb.AppendIndent(sbIndent).AppendLine("{");
                 sbIndent++;
@@ -366,71 +368,6 @@ namespace OdinInterop.SourceGenerator
                 sbIndent--;
                 sb.AppendLine("}");
             }
-
-            return sb.ToString();
-        }
-
-        private static void AppendParameters(StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool useInteroperableVersion)
-        {
-            var paramArray = parameters.ToArray();
-            for (int i = 0; i < paramArray.Length; i++)
-            {
-                if (i > 0) sb.Append(", ");
-                sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion);
-                sb.Append(" ");
-                sb.Append(paramArray[i].Name);
-            }
-        }
-
-        public static bool IsUnityObject(ITypeSymbol type)
-        {
-            if (type == null) return false;
-
-            if (GetFullTypeName(type) == "UnityEngine.Object")
-                return true;
-
-            return IsUnityObject(type.BaseType);
-        }
-
-        public static string GetFullTypeName(ISymbol symbol)
-        {
-            if (symbol == null) return string.Empty;
-
-            var parts = new List<string>();
-
-            // build the type name including nested types
-            ISymbol current = symbol;
-            while (current != null && !(current is INamespaceSymbol))
-            {
-                parts.Insert(0, current.Name);
-                current = current.ContainingType;
-            }
-
-            var typeName = string.Join(".", parts);
-
-            // add namespace if present
-            var ns = symbol.ContainingNamespace;
-            if (ns != null && !ns.IsGlobalNamespace)
-            {
-                var nsParts = new List<string>();
-                while (ns != null && !ns.IsGlobalNamespace)
-                {
-                    nsParts.Insert(0, ns.Name);
-                    ns = ns.ContainingNamespace;
-                }
-
-                if (nsParts.Count > 0)
-                {
-                    return string.Join(".", nsParts) + "." + typeName;
-                }
-            }
-
-            return typeName;
-        }
-
-        private bool HasGeneratedMethodAttribute(IMethodSymbol method)
-        {
-            return method.GetAttributes().Any(a => a.AttributeClass?.Name == "GeneratedMethodAttribute");
         }
 
         private sealed class Receiver : ISyntaxReceiver
@@ -467,6 +404,20 @@ namespace OdinInterop.SourceGenerator
             return sb;
         }
 
+        public static StringBuilder AppendParameters(this StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool useInteroperableVersion)
+        {
+            var paramArray = parameters.ToArray();
+            for (int i = 0; i < paramArray.Length; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion);
+                sb.Append(" ");
+                sb.Append(paramArray[i].Name);
+            }
+
+            return sb;
+        }
+
         public static StringBuilder AppendTypeName(this StringBuilder sb, ITypeSymbol type, bool useInteroperableVersion)
         {
             var specialType = type.SpecialType;
@@ -487,7 +438,7 @@ namespace OdinInterop.SourceGenerator
                 case SpecialType.System_Double: s = "double"; break;
                 case SpecialType.System_Boolean: s = "bool"; break;
                 default:
-                    var fullName = InteropGenerator.GetFullTypeName(type);
+                    var fullName = type.GetFullTypeName();
 
                     // unity types
                     if (fullName == "UnityEngine.Vector2") s = "UnityEngine.Vector2";
@@ -499,7 +450,7 @@ namespace OdinInterop.SourceGenerator
                     {
                         s = fullName;
                     }
-                    else if (InteropGenerator.IsUnityObject(type))
+                    else if (type.IsUnityObject())
                     {
                         s = useInteroperableVersion ? "int" : fullName;
                     }
@@ -525,6 +476,57 @@ namespace OdinInterop.SourceGenerator
                 sb.Append("#ERROR#");
                 return sb;
             }
+        }
+
+        public static string GetFullTypeName(this ISymbol symbol)
+        {
+            if (symbol == null) return string.Empty;
+
+            var parts = new List<string>();
+
+            // build the type name including nested types
+            ISymbol current = symbol;
+            while (current != null && !(current is INamespaceSymbol))
+            {
+                parts.Insert(0, current.Name);
+                current = current.ContainingType;
+            }
+
+            var typeName = string.Join(".", parts);
+
+            // add namespace if present
+            var ns = symbol.ContainingNamespace;
+            if (ns != null && !ns.IsGlobalNamespace)
+            {
+                var nsParts = new List<string>();
+                while (ns != null && !ns.IsGlobalNamespace)
+                {
+                    nsParts.Insert(0, ns.Name);
+                    ns = ns.ContainingNamespace;
+                }
+
+                if (nsParts.Count > 0)
+                {
+                    return string.Join(".", nsParts) + "." + typeName;
+                }
+            }
+
+            return typeName;
+        }
+
+        public static bool IsUnityObject(this ITypeSymbol type)
+        {
+            if (type == null) return false;
+
+            if (type.GetFullTypeName() == "UnityEngine.Object")
+                return true;
+
+            return type.BaseType.IsUnityObject();
+        }
+
+        public static bool HasGeneratedMethodAttribute(this IMethodSymbol method)
+        {
+            return method.GetAttributes().Any(a => a.AttributeClass?.Name == "GeneratedMethodAttribute");
         }
     }
 }
