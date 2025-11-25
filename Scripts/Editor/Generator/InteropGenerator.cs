@@ -35,8 +35,6 @@ namespace OdinInterop.Editor
                 }
             }
 
-            GenerateInteropCodeInternal(typeof(EngineBindings), true);
-
             foreach (var t in TypeCache.GetTypesWithAttribute<GenerateOdinInteropAttribute>())
             {
                 // public static partial classes only
@@ -46,7 +44,7 @@ namespace OdinInterop.Editor
                     continue;
                 }
 
-                GenerateInteropCodeInternal(t, false);
+                GenerateInteropCodeInternal(t);
             }
 
             AssetDatabase.Refresh();
@@ -64,7 +62,7 @@ namespace OdinInterop.Editor
             return sb;
         }
 
-        private static void GenerateInteropCodeInternal(Type t, bool isEngineCode)
+        private static void GenerateInteropCodeInternal(Type t)
         {
             string asmName = t.Assembly.GetName().Name;
 
@@ -256,14 +254,7 @@ namespace OdinInterop.Editor
 
         private static StringBuilder AppendOdnTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
         {
-            if (t.IsPointer)
-            {
-                sb.Append("^");
-                sb.AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
-                return sb;
-            }
-
-            if (t.IsByRef)
+            if (t.IsPointer || t.IsByRef)
             {
                 sb.Append("^");
                 sb.AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
