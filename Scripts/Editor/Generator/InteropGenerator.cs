@@ -263,6 +263,13 @@ namespace OdinInterop.Editor
                 return sb;
             }
 
+            if (t.IsByRef)
+            {
+                sb.Append("^");
+                sb.AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+                return sb;
+            }
+
             var isUnityNativeType = !string.IsNullOrWhiteSpace(t.Namespace) && t.Namespace.StartsWith("UnityEngine");
             var resolvedName = isUnityNativeType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for unity native types, just use the type name
 

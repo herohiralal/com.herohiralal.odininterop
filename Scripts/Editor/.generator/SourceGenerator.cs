@@ -128,7 +128,7 @@ namespace OdinInterop.SourceGenerator
             foreach (var method in exportedMethods)
             {
                 sb.AppendIndent(sbIndent).Append("private delegate ");
-                sb.AppendTypeName(method.ReturnType, true);
+                sb.AppendReturnType(method, true);
                 sb.Append($" odntrop_del_{method.Name}(");
                 sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(");");
@@ -148,7 +148,7 @@ namespace OdinInterop.SourceGenerator
             foreach (var method in importedMethods)
             {
                 sb.AppendIndent(sbIndent).Append("private delegate ");
-                sb.AppendTypeName(method.ReturnType, true);
+                sb.AppendReturnType(method, true);
                 sb.Append($" odntrop_del_{method.Name}(");
                 sb.AppendParameters(method.Parameters, true);
                 sb.AppendLine(");");
@@ -164,7 +164,7 @@ namespace OdinInterop.SourceGenerator
                     .AppendLine("))]")
                     .AppendIndent(sbIndent)
                     .Append("private static ")
-                    .AppendTypeName(method.ReturnType, true)
+                    .AppendReturnType(method, true)
                     .Append(" odntrop_exported_")
                     .Append(method.Name)
                     .Append("(");
@@ -176,6 +176,10 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent);
                 if (!method.ReturnsVoid)
                     sb.Append("return ");
+                if (method.ReturnsByRef)
+                    sb.Append("ref ");
+                else if (method.ReturnsByRefReadonly)
+                    sb.Append("ref readonly ");
                 sb.Append(method.Name).Append("(");
                 sb.AppendParameters(method.Parameters, null);
                 sb.AppendLine(");");
@@ -269,7 +273,7 @@ namespace OdinInterop.SourceGenerator
                     .AppendLine("\")]")
                     .AppendIndent(sbIndent)
                     .Append("private static extern ")
-                    .AppendTypeName(method.ReturnType, true)
+                    .AppendReturnType(method, true)
                     .Append(" odntrop_delref_")
                     .Append(method.Name)
                     .Append("(");
@@ -324,7 +328,7 @@ namespace OdinInterop.SourceGenerator
             {
                 sb.AppendIndent(sbIndent)
                     .Append("public static partial ")
-                    .AppendTypeName(method.ReturnType, false)
+                    .AppendReturnType(method, false)
                     .Append(" ")
                     .Append(method.Name)
                     .Append("(");
@@ -337,14 +341,56 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent)
                     .Append("if (odntrop_delref_")
                     .Append(method.Name)
-                    .Append(" == null) return")
-                    .Append(method.ReturnsVoid ? "" : " default")
-                    .AppendLine(";");
+                    .AppendLine(" == null)")
+                    .AppendIndent(sbIndent)
+                    .AppendLine("{");
+                sbIndent++;
+
+                foreach (var parm in method.Parameters)
+                {
+                    if (parm.RefKind == RefKind.Out)
+                    {
+                        sb
+                            .AppendIndent(sbIndent)
+                            .Append("EmptyRefReturn<")
+                            .AppendTypeName(parm.Type, false)
+                            .Append(">.Fill(out ")
+                            .Append(parm.Name)
+                            .AppendLine(");");
+                    }
+                }
+
+                sb.AppendIndent(sbIndent).Append("return");
+                if (!method.ReturnsVoid)
+                {
+                    if (method.ReturnsByRef || method.ReturnsByRefReadonly)
+                    {
+                        sb.Append(" ref ");
+                        if (method.ReturnsByRefReadonly)
+                            sb.Append("readonly ");
+
+                        sb
+                            .Append("EmptyRefReturn<")
+                            .AppendTypeName(method.ReturnType, false)
+                            .Append(">.corruptedValue");
+                    }
+                    else
+                    {
+                        sb.Append(" default");
+                    }
+                }
+                sb.AppendLine(";");
+                sbIndent--;
+                sb.AppendIndent(sbIndent).AppendLine("}");
                 sb.AppendLine("#endif");
 
                 sb.AppendIndent(sbIndent);
                 if (!method.ReturnsVoid)
                     sb.Append("return ");
+                if (method.ReturnsByRef)
+                    sb.Append("ref ");
+                else if (method.ReturnsByRefReadonly)
+                    sb.Append("ref readonly ");
                 sb.Append("odntrop_delref_")
                     .Append(method.Name)
                     .Append("(")
@@ -403,12 +449,41 @@ namespace OdinInterop.SourceGenerator
             return sb;
         }
 
+        public static StringBuilder AppendReturnType(this StringBuilder sb, IMethodSymbol mt, bool useInteroperableVersion)
+        {
+            if (mt.ReturnsByRef)
+                sb.Append("ref ");
+            else if (mt.ReturnsByRefReadonly)
+                sb.Append("ref readonly ");
+
+            sb.AppendTypeName(mt.ReturnType, useInteroperableVersion);
+            return sb;
+        }
+
         public static StringBuilder AppendParameters(this StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool? useInteroperableVersion)
         {
             var paramArray = parameters.ToArray();
             for (int i = 0; i < paramArray.Length; i++)
             {
                 if (i > 0) sb.Append(", ");
+
+                switch (paramArray[i].RefKind)
+                {
+                    case RefKind.None:
+                        break;
+                    case RefKind.Ref:
+                        sb.Append("ref ");
+                        break;
+                    case RefKind.Out:
+                        sb.Append("out ");
+                        break;
+                    case RefKind.In:
+                        sb.Append("in ");
+                        break;
+                    default:
+                        sb.Append("#ERROR_REF_KIND# ");
+                        break;
+                }
 
                 if (useInteroperableVersion.HasValue)
                 {
