@@ -511,10 +511,7 @@ namespace OdinInterop.SourceGenerator
                 var elementType = ats.ElementType;
                 if (useInteroperableVersion)
                 {
-                    sb.Append("Slice<");
-                    sb.AppendTypeName(elementType, true);
-                    sb.Append(">");
-                    return sb;
+                    return sb.Append("RawSlice");
                 }
                 else
                 {
@@ -525,23 +522,35 @@ namespace OdinInterop.SourceGenerator
             }
 
             if (type is INamedTypeSymbol nt &&
-                nt.OriginalDefinition.SpecialType == SpecialType.None &&
-                nt.OriginalDefinition.ToString() == "System.Collections.Generic.List<T>")
+                nt.OriginalDefinition.SpecialType == SpecialType.None)
             {
-                var elementType = nt.TypeArguments[0];
-                if (useInteroperableVersion)
+                var odStr = nt.OriginalDefinition.ToString();
+                if (odStr == "System.Collections.Generic.List<T>")
                 {
-                    sb.Append("DynamicArray<");
-                    sb.AppendTypeName(elementType, true);
-                    sb.Append(">");
-                    return sb;
+                    var elementType = nt.TypeArguments[0];
+                    if (useInteroperableVersion)
+                    {
+                        return sb.Append("RawDynamicArray");
+                    }
+                    else
+                    {
+                        sb.Append("List<");
+                        sb.AppendTypeName(elementType, false);
+                        sb.Append(">");
+                        return sb;
+                    }
                 }
-                else
+                else if (odStr == "OdinInterop.DynamicArray<T>")
                 {
-                    sb.Append("List<");
-                    sb.AppendTypeName(elementType, false);
-                    sb.Append(">");
-                    return sb;
+                    return sb.Append("RawDynamicArray");
+                }
+                else if (odStr == "OdinInterop.Slice<T>")
+                {
+                    return sb.Append("RawSlice");
+                }
+                else if (odStr == "OdinInterop.ObjectHandle<T>")
+                {
+                    return sb.Append("RawObjectHandle");
                 }
             }
 
@@ -581,7 +590,7 @@ namespace OdinInterop.SourceGenerator
                     }
                     else if (type.IsUnityObject())
                     {
-                        s = useInteroperableVersion ? "int" : fullName;
+                        s = useInteroperableVersion ? "RawObjectHandle" : fullName;
                     }
 
                     else if (useInteroperableVersion)

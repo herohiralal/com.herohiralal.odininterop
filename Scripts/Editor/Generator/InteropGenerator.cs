@@ -354,7 +354,7 @@ namespace OdinInterop.Editor
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Slice<>))
             {
-                sb.Append("[]").AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+                sb.Append("[]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
             {

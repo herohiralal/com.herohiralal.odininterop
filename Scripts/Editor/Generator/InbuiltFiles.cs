@@ -13,8 +13,8 @@ package src
 
 @require import ""base:runtime""
 
-@thread_local G_OdnTrop_Internal_Ctx: runtime.Context
-@thread_local G_OdnTrop_Internal_CtxNesting: uint
+@thread_local @private G_OdnTrop_Internal_Ctx: runtime.Context
+@thread_local @private G_OdnTrop_Internal_CtxNesting: uint
 ";
     }
 }
