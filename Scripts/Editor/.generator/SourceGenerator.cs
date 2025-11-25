@@ -39,7 +39,7 @@ namespace OdinInterop.SourceGenerator
                 GenerateInteropCode(sb, classSymbol);
                 if (sb.Length != 0)
                 {
-                    var fileName = $"{classSymbol.Name}.g.cs";
+                    var fileName = $"{classSymbol.GetFullTypeName().Replace(".", "___")}.g.cs";
                     ctx.AddSource(fileName, SourceText.From(sb.ToString(), Encoding.UTF8));
                 }
                 sb.Clear();
