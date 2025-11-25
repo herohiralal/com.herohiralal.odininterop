@@ -27,8 +27,9 @@ namespace OdinInterop
 
     public static class EmptyRefReturn<T>
     {
-        public static ref T corruptedValue => throw new Exception("Interop library not loaded. Cannot return by ref from interop method.");
+        private static T s_InternalValue;
+        public static ref T corruptedValue => ref s_InternalValue;
 
-        public static void Fill(out T value) => throw new Exception("Interop library not loaded. Cannot return by ref from interop method.");
+        public static void Fill(out T value) => value = default;
     }
 }
