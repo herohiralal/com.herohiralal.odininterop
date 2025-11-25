@@ -651,6 +651,59 @@ namespace OdinInterop.Editor
 
             return success;
         }
+
+        [MenuItem("Tools/Odin Interop/Build Libraries for All Platforms (Debug)")]
+        private static void BuildAllPlatformDebugDlls()
+        {
+            CompileOdinInteropLibraryForWindows(isRelease: false);
+            CompileOdinInteropLibraryForLinux(isRelease: false);
+            CompileOdinInteropLibraryForMacOS(isRelease: false);
+            CompileOdinInteropLibraryForAndroid(isRelease: false);
+            CompileOdinInteropLibraryForIOS(isRelease: false);
+        }
+
+        [MenuItem("Tools/Odin Interop/Build Libraries for All Platforms (Release)")]
+        private static void BuildAllPlatformReleaseDlls()
+        {
+            CompileOdinInteropLibraryForWindows(isRelease: true);
+            CompileOdinInteropLibraryForLinux(isRelease: true);
+            CompileOdinInteropLibraryForMacOS(isRelease: true);
+            CompileOdinInteropLibraryForAndroid(isRelease: true);
+            CompileOdinInteropLibraryForIOS(isRelease: true);
+        }
+
+        [MenuItem("Tools/Odin Interop/Clean Built Libraries")]
+        internal static void CleanBuiltLibraries()
+        {
+            var l = new List<string>(32)
+            {
+                // windows
+                ODIN_WINDOWS_PLUGIN_PATH,
+                ODIN_WINDOWS_PLUGIN_EXP_PATH,
+                ODIN_WINDOWS_PLUGIN_PDB_PATH,
+                ODIN_WINDOWS_PLUGIN_STAT_PATH,
+                // android
+                ODIN_ANDROID_ARMv7_PLUGIN_PATH,
+                ODIN_ANDROID_ARMv8_PLUGIN_PATH,
+                ODIN_ANDROID_X8664_PLUGIN_PATH,
+                // linux
+                ODIN_LINUX_PLUGIN_PATH,
+                // macOS
+                ODIN_OSX_FAT_PLUGIN_PATH,
+                // iOS
+                ODIN_IOS_PLUGIN_PATH
+            };
+
+            foreach (var path in l)
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+
+                var meta = path + ".meta";
+                if (File.Exists(meta))
+                    File.Delete(meta);
+            }
+        }
     }
 
     internal class OdinCompilerBuildPreprocessor : IPreprocessBuildWithReport
@@ -718,46 +771,6 @@ namespace OdinInterop.Editor
     internal class OdinCompilerBuildPostprocessor : IPostprocessBuildWithReport
     {
         public int callbackOrder => 0;
-
-        public void OnPostprocessBuild(BuildReport report)
-        {
-            var l = new List<string>(32);
-
-            if (report.summary.platform == BuildTarget.StandaloneWindows64)
-            {
-                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_PATH);
-                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_EXP_PATH);
-                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_PDB_PATH);
-                l.Add(OdinCompiler.ODIN_WINDOWS_PLUGIN_STAT_PATH);
-            }
-            else if (report.summary.platform == BuildTarget.Android)
-            {
-                l.Add(OdinCompiler.ODIN_ANDROID_ARMv7_PLUGIN_PATH);
-                l.Add(OdinCompiler.ODIN_ANDROID_ARMv8_PLUGIN_PATH);
-                l.Add(OdinCompiler.ODIN_ANDROID_X8664_PLUGIN_PATH);
-            }
-            else if (report.summary.platform == BuildTarget.StandaloneLinux64)
-            {
-                l.Add(OdinCompiler.ODIN_LINUX_PLUGIN_PATH);
-            }
-            else if (report.summary.platform == BuildTarget.StandaloneOSX)
-            {
-                l.Add(OdinCompiler.ODIN_OSX_FAT_PLUGIN_PATH);
-            }
-            else if (report.summary.platform == BuildTarget.iOS)
-            {
-                l.Add(OdinCompiler.ODIN_IOS_PLUGIN_PATH);
-            }
-
-            foreach (var path in l)
-            {
-                if (File.Exists(path))
-                    File.Delete(path);
-
-                var meta = path + ".meta";
-                if (File.Exists(meta))
-                    File.Delete(meta);
-            }
-        }
+        public void OnPostprocessBuild(BuildReport report) => OdinCompiler.CleanBuiltLibraries();
     }
 }
