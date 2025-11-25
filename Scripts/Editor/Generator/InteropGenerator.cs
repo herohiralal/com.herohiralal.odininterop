@@ -348,6 +348,42 @@ namespace OdinInterop.Editor
             {
                 sb.Append("[4]f32");
             }
+            else if (t.IsArray)
+            {
+                sb.Append("[]").AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+            }
+            else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Slice<>))
+            {
+                sb.Append("[]").AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+            }
+            else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
+            }
+            else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(DynamicArray<>))
+            {
+                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
+            }
+            else if (t == typeof(RawSlice))
+            {
+                sb.Append("runtime.Raw_Slice");
+            }
+            else if (t == typeof(RawDynamicArray))
+            {
+                sb.Append("runtime.Raw_Dynamic_Array");
+            }
+            else if (t == typeof(string))
+            {
+                sb.Append("string16");
+            }
+            else if (t == typeof(String8))
+            {
+                sb.Append("string");
+            }
+            else if (t == typeof(String16))
+            {
+                sb.Append("string16");
+            }
             else
             {
                 sb.Append(resolvedName);

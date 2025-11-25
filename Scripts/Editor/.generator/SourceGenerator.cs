@@ -506,6 +506,45 @@ namespace OdinInterop.SourceGenerator
                 return sb;
             }
 
+            if (type is IArrayTypeSymbol ats)
+            {
+                var elementType = ats.ElementType;
+                if (useInteroperableVersion)
+                {
+                    sb.Append("Slice<");
+                    sb.AppendTypeName(elementType, true);
+                    sb.Append(">");
+                    return sb;
+                }
+                else
+                {
+                    sb.AppendTypeName(elementType, false);
+                    sb.Append("[]");
+                    return sb;
+                }
+            }
+
+            if (type is INamedTypeSymbol nt &&
+                nt.OriginalDefinition.SpecialType == SpecialType.None &&
+                nt.OriginalDefinition.ToString() == "System.Collections.Generic.List<T>")
+            {
+                var elementType = nt.TypeArguments[0];
+                if (useInteroperableVersion)
+                {
+                    sb.Append("DynamicArray<");
+                    sb.AppendTypeName(elementType, true);
+                    sb.Append(">");
+                    return sb;
+                }
+                else
+                {
+                    sb.Append("List<");
+                    sb.AppendTypeName(elementType, false);
+                    sb.Append(">");
+                    return sb;
+                }
+            }
+
             var specialType = type.SpecialType;
 
             string s;
@@ -532,6 +571,10 @@ namespace OdinInterop.SourceGenerator
                     else if (fullName == "UnityEngine.Vector4") s = "UnityEngine.Vector4";
                     else if (fullName == "UnityEngine.Quaternion") s = "UnityEngine.Quaternion";
                     else if (fullName == "UnityEngine.Color") s = "UnityEngine.Color";
+                    else if (fullName.StartsWith("OdinInterop.Slice")) s = fullName;
+                    else if (fullName.StartsWith("OdinInterop.DynamicArray")) s = fullName;
+                    else if (fullName == "OdinInterop.String8") s = "OdinInterop.String";
+                    else if (fullName == "OdinInterop.String16") s = "OdinInterop.String16";
                     else if (type.TypeKind == TypeKind.Enum) // enum
                     {
                         s = fullName;
