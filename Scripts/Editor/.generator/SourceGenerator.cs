@@ -473,7 +473,7 @@ namespace OdinInterop.SourceGenerator
             }
             else
             {
-                sb.Append("#ERROR#");
+                sb.Append($"#ERROR {type.GetFullTypeName()}#");
                 return sb;
             }
         }
@@ -484,12 +484,21 @@ namespace OdinInterop.SourceGenerator
 
             var parts = new List<string>();
 
-            // build the type name including nested types
             ISymbol current = symbol;
-            while (current != null && !(current is INamespaceSymbol))
+            while (current is INamedTypeSymbol nts)
             {
-                parts.Insert(0, current.Name);
-                current = current.ContainingType;
+                var name = nts.Name;
+                if (nts.TypeArguments.Length != 0)
+                {
+                    var args = nts.TypeArguments
+                        .Select(arg => arg.GetFullTypeName()) // recursive
+                        .ToArray();
+
+                    name = $"{name}<{string.Join(", ", args)}>";
+                }
+
+                parts.Insert(0, name);
+                current = nts.ContainingType;
             }
 
             var typeName = string.Join(".", parts);
