@@ -655,21 +655,29 @@ namespace OdinInterop.Editor
         [MenuItem("Tools/Odin Interop/Build Libraries for All Platforms (Debug)")]
         private static void BuildAllPlatformDebugDlls()
         {
+#if UNITY_EDITOR_WIN
             CompileOdinInteropLibraryForWindows(isRelease: false);
+#endif
             CompileOdinInteropLibraryForLinux(isRelease: false);
-            CompileOdinInteropLibraryForMacOS(isRelease: false);
             CompileOdinInteropLibraryForAndroid(isRelease: false);
+#if UNITY_EDITOR_OSX
+            CompileOdinInteropLibraryForMacOS(isRelease: false);
             CompileOdinInteropLibraryForIOS(isRelease: false);
+#endif
         }
 
         [MenuItem("Tools/Odin Interop/Build Libraries for All Platforms (Release)")]
         private static void BuildAllPlatformReleaseDlls()
         {
+#if UNITY_EDITOR_WIN
             CompileOdinInteropLibraryForWindows(isRelease: true);
+#endif
             CompileOdinInteropLibraryForLinux(isRelease: true);
-            CompileOdinInteropLibraryForMacOS(isRelease: true);
             CompileOdinInteropLibraryForAndroid(isRelease: true);
+#if UNITY_EDITOR_OSX
+            CompileOdinInteropLibraryForMacOS(isRelease: true);
             CompileOdinInteropLibraryForIOS(isRelease: true);
+#endif
         }
 
         [MenuItem("Tools/Odin Interop/Clean Built Libraries")]
