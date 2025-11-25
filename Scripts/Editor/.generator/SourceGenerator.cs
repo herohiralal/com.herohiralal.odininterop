@@ -49,8 +49,8 @@ namespace OdinInterop.SourceGenerator
             if (!classSymbol.GetAttributes().Any(a => a.AttributeClass?.Name == "GenerateOdinInteropAttribute"))
                 return false;
 
-            // is public+static class
-            if (!classSymbol.IsStatic || classSymbol.DeclaredAccessibility != Accessibility.Public)
+            // is static class
+            if (!classSymbol.IsStatic)
                 return false;
 
             return true;
@@ -66,16 +66,15 @@ namespace OdinInterop.SourceGenerator
                 .OfType<IMethodSymbol>()
                 .Where(m => m.MethodKind == MethodKind.Ordinary &&
                            m.IsStatic &&
-                           m.DeclaredAccessibility == Accessibility.Public &&
-                           !m.Name.StartsWith("odntrop_") &&
-                           !m.HasGeneratedMethodAttribute())
+                           m.DeclaredAccessibility == Accessibility.Private &&
+                           !m.Name.StartsWith("odntrop_"))
                 .ToList();
 
-            var toImportType = classSymbol.GetTypeMembers("ToImport").FirstOrDefault();
-            var importedMethods = toImportType?.GetMembers()
+            var importedMethods = classSymbol.GetMembers()
                 .OfType<IMethodSymbol>()
                 .Where(m => m.MethodKind == MethodKind.Ordinary &&
                            m.IsStatic &&
+                           m.IsPartialDefinition &&
                            m.DeclaredAccessibility == Accessibility.Public &&
                            !m.Name.StartsWith("odntrop_"))
                 .ToList() ?? new List<IMethodSymbol>();
@@ -99,7 +98,28 @@ namespace OdinInterop.SourceGenerator
                 sbIndent++;
             }
 
-            sb.AppendIndent(sbIndent).AppendLine($"public static partial class {classSymbol.Name}");
+            sb.AppendIndent(sbIndent);
+
+            switch (classSymbol.DeclaredAccessibility)
+            {
+                case Accessibility.NotApplicable:
+                    sb.Append("");
+                    break;
+                case Accessibility.Private:
+                    sb.Append("private ");
+                    break;
+                case Accessibility.Internal:
+                    sb.Append("internal ");
+                    break;
+                case Accessibility.Public:
+                    sb.Append("public ");
+                    break;
+                default:
+                    sb.Append("UNSUPPORTED_ACCESSIBILITY ");
+                    break;
+            }
+
+            sb.AppendLine($"static partial class {classSymbol.Name}");
             sb.AppendIndent(sbIndent).AppendLine("{");
             sbIndent++;
 
@@ -316,9 +336,8 @@ namespace OdinInterop.SourceGenerator
             // wrapper for the user to call
             foreach (var method in importedMethods)
             {
-                sb.AppendIndent(sbIndent).AppendLine("[GeneratedMethod]");
                 sb.AppendIndent(sbIndent)
-                    .Append("public static ")
+                    .Append("public static partial ")
                     .AppendTypeName(method.ReturnType, false)
                     .Append(" ")
                     .Append(method.Name)
@@ -348,9 +367,7 @@ namespace OdinInterop.SourceGenerator
                     if (i > 0) sb.Append(", ");
                     sb.Append(method.Parameters[i].Name);
                 }
-                sb.Append(")")
-                    .Append(method.ReturnsVoid ? "" : " ?? default")
-                    .AppendLine(";");
+                sb.AppendLine(");");
 
                 sbIndent--;
                 sb.AppendIndent(sbIndent).AppendLine("}");
@@ -531,11 +548,6 @@ namespace OdinInterop.SourceGenerator
                 return true;
 
             return type.BaseType.IsUnityObject();
-        }
-
-        public static bool HasGeneratedMethodAttribute(this IMethodSymbol method)
-        {
-            return method.GetAttributes().Any(a => a.AttributeClass?.Name == "GeneratedMethodAttribute");
         }
     }
 }

@@ -46,12 +46,6 @@ namespace OdinInterop.Editor
                     continue;
                 }
 
-                if (!t.IsPublic)
-                {
-                    Debug.LogError($"[Odin Interop] Type {t.FullName} is marked with GenerateOdinInteropAttribute but is not public. Skipping...");
-                    continue;
-                }
-
                 GenerateInteropCodeInternal(t, false);
             }
 
@@ -76,10 +70,8 @@ namespace OdinInterop.Editor
 
             var tyName = t.FullName.Replace('+', '.').Replace(".", "___");
 
-            var exportedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_") && x.GetCustomAttribute<GeneratedMethodAttribute>() == null).ToArray();
-
-            var toImport = t.GetNestedType("ToImport", BindingFlags.Public | BindingFlags.NonPublic);
-            var importedFns = (toImport?.GetMethods(BindingFlags.Public | BindingFlags.Static) ?? Array.Empty<MethodInfo>()).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
+            var exportedFns = t.GetMethods(BindingFlags.NonPublic | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
+            var importedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
 
             {
                 var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{t.FullName.Replace('+', '.')}.odin"));

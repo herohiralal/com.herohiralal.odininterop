@@ -1,10 +1,7 @@
 namespace OdinInterop
 {
     [GenerateOdinInterop]
-    public static partial class EngineBindings
+    internal static partial class EngineBindings
     {
-        public static partial class ToImport
-        {
-        }
     }
 }
