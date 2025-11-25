@@ -663,10 +663,14 @@ namespace OdinInterop.Editor
 
             if (report.summary.platform == BuildTarget.StandaloneWindows64)
             {
+#if UNITY_EDITOR_WIN
                 if (!OdinCompiler.CompileOdinInteropLibraryForWindows(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for Windows build.");
                 }
+#else
+                throw new BuildFailedException("OdinInterop Windows builds can only be performed on Windows hosts.");
+#endif
             }
             else if (report.summary.platform == BuildTarget.Android)
             {
@@ -684,17 +688,25 @@ namespace OdinInterop.Editor
             }
             else if (report.summary.platform == BuildTarget.StandaloneOSX)
             {
+#if UNITY_EDITOR_OSX
                 if (!OdinCompiler.CompileOdinInteropLibraryForMacOS(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for macOS build.");
                 }
+#else
+                throw new BuildFailedException("OdinInterop macOS builds can only be performed on macOS hosts.");
+#endif
             }
             else if (report.summary.platform == BuildTarget.iOS)
             {
+#if UNITY_EDITOR_OSX
                 if (!OdinCompiler.CompileOdinInteropLibraryForIOS(isRelease))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for iOS build.");
                 }
+#else
+                throw new BuildFailedException("OdinInterop iOS builds can only be performed on macOS hosts.");
+#endif
             }
             else
             {
