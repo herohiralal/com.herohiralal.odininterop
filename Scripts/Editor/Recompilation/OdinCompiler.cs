@@ -561,6 +561,7 @@ namespace OdinInterop.Editor
             args.Add("-min-link-libs");
             args.Add("-use-single-module");
             args.Add("-reloc-mode:pic");
+            args.Add("-error-pos-style:unix");
             if (!isRelease)
             {
                 args.Add("-debug");

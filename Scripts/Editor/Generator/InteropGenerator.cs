@@ -53,7 +53,23 @@ namespace OdinInterop.Editor
                 GenerateInteropCodeInternal(t);
             }
 
-            AssetDatabase.Refresh();
+            // export types
+            {
+                s_StrBld.Clear();
+                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_internal_exportedtypes.odin"));
+                s_StrBld
+                    .AppendLine("// THIS IS A GENERATED FILE - DO NOT MODIFY OR YOUR CHANGES WILL BE LOST!")
+                    .AppendLine("#+vet !tabs !unused !style")
+                    .AppendLine("package src")
+                    .AppendLine();
+
+                foreach (var t in s_ExportedTypes)
+                {
+                    s_StrBld.AppendOdnTypeDef(t);
+                }
+
+                File.WriteAllText(tgtFile, s_StrBld.ToString());
+            }
         }
 
         private static StringBuilder s_StrBld = new StringBuilder(16384);
@@ -268,6 +284,86 @@ namespace OdinInterop.Editor
             }
         }
 
+        private static StringBuilder AppendOdnTypeDef(this StringBuilder sb, Type t)
+        {
+            if (t == typeof(UnityEngine.Object))
+            {
+                return sb.AppendIndent().AppendLine("Object :: struct { id: i32 }").AppendLine();
+            }
+
+            var resolvedName = t.GetResolvedOdnTypeName();
+
+            if (typeof(UnityEngine.Object).IsAssignableFrom(t))
+            {
+                if (!s_ExportedTypes.Contains(t.BaseType))
+                {
+                    // need to export base type first
+                    sb.AppendOdnTypeDef(t.BaseType);
+                }
+
+                var baseTypeResolvedName = t.BaseType.GetResolvedOdnTypeName();
+                return sb.AppendIndent().Append($"{resolvedName} :: struct {{ #subtype parent: {baseTypeResolvedName} }}").AppendLine();
+            }
+
+            if (t.IsEnum)
+            {
+                var underlyingType = t.GetEnumUnderlyingType();
+                sb.AppendIndent().Append($"{resolvedName} :: enum ").AppendOdnTypeName(underlyingType, false).AppendLine(" {");
+                s_StrBldIndent++;
+                var names = t.GetEnumNames();
+                var vals = t.GetEnumValues();
+                for (int i = 0; i < names.Length; i++)
+                {
+                    sb.AppendIndent().Append(names[i]).Append(" = ");
+                    if (underlyingType == typeof(ulong))
+                    {
+                        sb.Append((ulong)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(long))
+                    {
+                        sb.Append((long)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(uint))
+                    {
+                        sb.Append((uint)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(int))
+                    {
+                        sb.Append((int)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(ushort))
+                    {
+                        sb.Append((ushort)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(short))
+                    {
+                        sb.Append((short)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(byte))
+                    {
+                        sb.Append((byte)vals.GetValue(i));
+                    }
+                    else if (underlyingType == typeof(sbyte))
+                    {
+                        sb.Append((sbyte)vals.GetValue(i));
+                    }
+                    sb.AppendLine(",");
+                }
+                s_StrBldIndent--;
+                return sb.AppendIndent().AppendLine("}").AppendLine();
+            }
+
+            // todo
+            return sb.Append($"#panic(\"{resolvedName} has not been handled correctly.\")").AppendLine();
+        }
+
+        private static string GetResolvedOdnTypeName(this Type t)
+        {
+            var isInternalType = t.Namespace == "UnityEngine" || t.Namespace == "OdinInterop";
+            var resolvedName = isInternalType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for internal types, just use the type name
+            return resolvedName;
+        }
+
         private static StringBuilder AppendOdnTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
         {
             if (t.IsPointer || t.IsByRef)
@@ -277,8 +373,7 @@ namespace OdinInterop.Editor
                 return sb;
             }
 
-            var isInternalType = t.Namespace == "UnityEngine" || t.Namespace == "OdinInterop";
-            var resolvedName = isInternalType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for internal types, just use the type name
+            var resolvedName = t.GetResolvedOdnTypeName();
 
             if (t == typeof(void))
             {
@@ -364,6 +459,11 @@ namespace OdinInterop.Editor
             {
                 sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
             }
+            else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ObjectHandle<>))
+            {
+                var tgt = t.GetGenericArguments()[0];
+                sb.AppendOdnTypeName(tgt, useInteroperableVersion);
+            }
             else if (t == typeof(RawSlice))
             {
                 sb.Append("runtime.Raw_Slice");
@@ -371,6 +471,10 @@ namespace OdinInterop.Editor
             else if (t == typeof(RawDynamicArray))
             {
                 sb.Append("runtime.Raw_Dynamic_Array");
+            }
+            else if (t == typeof(RawObjectHandle))
+            {
+                sb.Append("Object");
             }
             else if (t == typeof(string))
             {

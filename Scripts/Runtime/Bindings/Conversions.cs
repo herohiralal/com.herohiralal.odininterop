@@ -177,6 +177,13 @@ namespace OdinInterop
     {
         public int id;
 
+        public static implicit operator bool(ObjectHandle<T> handle)
+        {
+            return handle.id != 0;
+        }
+
+        public T value => (T)this;
+
         public static implicit operator T(ObjectHandle<T> handle)
         {
             return (T)Resources.InstanceIDToObject(handle.id);
