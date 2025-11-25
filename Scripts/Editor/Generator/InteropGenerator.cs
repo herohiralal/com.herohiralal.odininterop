@@ -35,6 +35,12 @@ namespace OdinInterop.Editor
                 }
             }
 
+            foreach (var (n, c) in InteropGeneratorInbuiltFiles.files)
+            {
+                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{n}"));
+                File.WriteAllText(tgtFile, c);
+            }
+
             foreach (var t in TypeCache.GetTypesWithAttribute<GenerateOdinInteropAttribute>())
             {
                 // public static partial classes only
@@ -64,15 +70,15 @@ namespace OdinInterop.Editor
 
         private static void GenerateInteropCodeInternal(Type t)
         {
-            string asmName = t.Assembly.GetName().Name;
-
             var tyName = t.FullName.Replace('+', '.').Replace(".", "___");
+            var cleanTyName = tyName == "OdinInterop___EngineBindings" ? "" : tyName;
+            var underScoreIfCleanTyName = cleanTyName == "" ? "" : "_";
 
             var exportedFns = t.GetMethods(BindingFlags.NonPublic | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
             var importedFns = t.GetMethods(BindingFlags.Public | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();
 
             {
-                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{t.FullName.Replace('+', '.')}.odin"));
+                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{tyName}.odin"));
 
                 s_StrBld
                     .Clear()
@@ -89,7 +95,7 @@ namespace OdinInterop.Editor
                     {
                         s_StrBld
                             .AppendIndent()
-                            .Append($"odntrop_del_{tyName}_{importedFn.Name} :: #type proc(");
+                            .Append($"{cleanTyName}{underScoreIfCleanTyName}{importedFn.Name}Delegate :: #type proc(");
 
                         var parms = importedFn.GetParameters();
                         for (int i = 0; i < parms.Length; i++)
@@ -135,10 +141,14 @@ namespace OdinInterop.Editor
                         s_StrBldIndent++;
                         s_StrBld
                             .AppendIndent()
-                            .AppendLine("context = runtime.default_context()")
+                            .AppendLine("context = runtime.default_context() if G_OdnTrop_Internal_CtxNesting == 0 else G_OdnTrop_Internal_Ctx")
+                            .AppendIndent()
+                            .AppendLine("G_OdnTrop_Internal_CtxNesting += 1")
+                            .AppendIndent()
+                            .AppendLine("defer G_OdnTrop_Internal_CtxNesting -= 1")
                             .AppendIndent()
                             .Append(importedFn.ReturnType == typeof(void) ? "" : "return ")
-                            .Append($"odntrop_{tyName}_{importedFn.Name}(");
+                            .Append($"{cleanTyName}{underScoreIfCleanTyName}{importedFn.Name}(");
 
                         for (int i = 0; i < parms.Length; i++)
                         {
@@ -211,7 +221,7 @@ namespace OdinInterop.Editor
                     {
                         s_StrBld
                             .AppendIndent()
-                            .Append($"{tyName}_{exportedFn.Name} :: proc(");
+                            .Append($"{cleanTyName}{underScoreIfCleanTyName}{exportedFn.Name} :: proc(");
 
                         var parms = exportedFn.GetParameters();
                         for (int i = 0; i < parms.Length; i++)
@@ -230,6 +240,12 @@ namespace OdinInterop.Editor
                         s_StrBld.AppendLine(" {");
                         s_StrBldIndent++;
                         s_StrBld
+                            .AppendIndent()
+                            .AppendLine("odntrop_internal_tempCtx := G_OdnTrop_Internal_Ctx")
+                            .AppendIndent()
+                            .AppendLine("G_OdnTrop_Internal_Ctx = context")
+                            .AppendIndent()
+                            .AppendLine("defer G_OdnTrop_Internal_Ctx = odntrop_internal_tempCtx")
                             .AppendIndent()
                             .Append(exportedFn.ReturnType == typeof(void) ? "" : "return ")
                             .Append($"odntrop_dydel_{tyName}_{exportedFn.Name}(");
@@ -261,8 +277,8 @@ namespace OdinInterop.Editor
                 return sb;
             }
 
-            var isUnityNativeType = !string.IsNullOrWhiteSpace(t.Namespace) && t.Namespace.StartsWith("UnityEngine");
-            var resolvedName = isUnityNativeType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for unity native types, just use the type name
+            var isInternalType = t.Namespace == "UnityEngine" || t.Namespace == "OdinInterop";
+            var resolvedName = isInternalType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for internal types, just use the type name
 
             if (t == typeof(void))
             {
