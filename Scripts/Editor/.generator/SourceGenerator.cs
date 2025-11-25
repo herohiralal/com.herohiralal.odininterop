@@ -187,11 +187,7 @@ namespace OdinInterop.SourceGenerator
                 if (!method.ReturnsVoid)
                     sb.Append("return ");
                 sb.Append(method.Name).Append("(");
-                for (int i = 0; i < method.Parameters.Length; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(method.Parameters[i].Name);
-                }
+                sb.AppendParameters(method.Parameters, null);
                 sb.AppendLine(");");
 
                 sbIndent--;
@@ -361,13 +357,9 @@ namespace OdinInterop.SourceGenerator
                     sb.Append("return ");
                 sb.Append("odntrop_delref_")
                     .Append(method.Name)
-                    .Append("(");
-                for (int i = 0; i < method.Parameters.Length; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(method.Parameters[i].Name);
-                }
-                sb.AppendLine(");");
+                    .Append("(")
+                    .AppendParameters(method.Parameters, null)
+                    .AppendLine(");");
 
                 sbIndent--;
                 sb.AppendIndent(sbIndent).AppendLine("}");
@@ -421,14 +413,19 @@ namespace OdinInterop.SourceGenerator
             return sb;
         }
 
-        public static StringBuilder AppendParameters(this StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool useInteroperableVersion)
+        public static StringBuilder AppendParameters(this StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool? useInteroperableVersion)
         {
             var paramArray = parameters.ToArray();
             for (int i = 0; i < paramArray.Length; i++)
             {
                 if (i > 0) sb.Append(", ");
-                sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion);
-                sb.Append(" ");
+
+                if (useInteroperableVersion.HasValue)
+                {
+                    sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion.Value);
+                    sb.Append(" ");
+                }
+
                 sb.Append(paramArray[i].Name);
             }
 
