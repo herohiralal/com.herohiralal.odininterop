@@ -29,7 +29,10 @@ namespace OdinInterop.SourceGenerator
                 var model = compilation.GetSemanticModel(classDeclaration.SyntaxTree);
                 var classSymbol = model.GetDeclaredSymbol(classDeclaration);
 
-                if (classSymbol == null || !IsValidInteropClass(classSymbol))
+                if (classSymbol == null ||
+                    !classSymbol.IsStatic || // is static
+                                             // has attribute
+                    !classSymbol.GetAttributes().Any(a => a.AttributeClass?.GetFullTypeName() == "OdinInterop.GenerateOdinInteropAttribute"))
                     continue;
 
                 sb.Clear();
@@ -41,19 +44,6 @@ namespace OdinInterop.SourceGenerator
                 }
                 sb.Clear();
             }
-        }
-
-        private static bool IsValidInteropClass(INamedTypeSymbol classSymbol)
-        {
-            // has generate attribute
-            if (!classSymbol.GetAttributes().Any(a => a.AttributeClass?.Name == "GenerateOdinInteropAttribute"))
-                return false;
-
-            // is static class
-            if (!classSymbol.IsStatic)
-                return false;
-
-            return true;
         }
 
         private void GenerateInteropCode(StringBuilder sb, INamedTypeSymbol classSymbol)
@@ -119,7 +109,7 @@ namespace OdinInterop.SourceGenerator
                     break;
             }
 
-            sb.AppendLine($"static partial class {classSymbol.Name}");
+            sb.AppendLine($"static unsafe partial class {classSymbol.Name}");
             sb.AppendIndent(sbIndent).AppendLine("{");
             sbIndent++;
 
@@ -434,6 +424,13 @@ namespace OdinInterop.SourceGenerator
 
         public static StringBuilder AppendTypeName(this StringBuilder sb, ITypeSymbol type, bool useInteroperableVersion)
         {
+            if (type is IPointerTypeSymbol pts)
+            {
+                sb.AppendTypeName(pts.PointedAtType, useInteroperableVersion);
+                sb.Append("*");
+                return sb;
+            }
+
             var specialType = type.SpecialType;
 
             string s;
