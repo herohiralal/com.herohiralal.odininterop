@@ -313,6 +313,23 @@ OdnTrop_Internal_GenerateRandomNumber :: proc(data: rawptr, mode: runtime.Random
 		info^ = {.Uniform, .Resettable}
 	}
 }
+
+@(private = ""file"")
+UnityOdnTropInternalAllocateString8: UnityOdnTropInternalAllocateString8Delegate : proc(length: i32) -> string {
+	x := make([]u8, auto_cast length)
+	return transmute(string)x
+}
+
+@(private = ""file"")
+UnityOdnTropInternalAllocateString16: UnityOdnTropInternalAllocateString16Delegate : proc(length: i32) -> string16 {
+	x := make([]u16, auto_cast length)
+	return transmute(string16)x
+}
+
+InstantiateObject :: proc {
+	InstantiateObjectWithoutTransform,
+	InstantiateObjectWithTransform,
+}
 ";
 	}
 }

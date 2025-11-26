@@ -109,6 +109,14 @@ namespace OdinInterop.Editor
                 {
                     // delegate so user can stick to the signature
                     {
+                        if (importedFn.Name.StartsWith("UnityOdnTropInternal"))
+                        {
+                            // internal stuff
+                            s_StrBld
+                                .AppendIndent()
+                                .AppendLine("@(private = \"file\")");
+                        }
+
                         s_StrBld
                             .AppendIndent()
                             .Append($"{cleanTyName}{underScoreIfCleanTyName}{importedFn.Name}Delegate :: #type proc(");
@@ -252,6 +260,10 @@ namespace OdinInterop.Editor
                         {
                             var p = parms[i];
                             s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
+                            if (p.HasDefaultValue)
+                            {
+                                s_StrBld.Append(" = {}");
+                            }
                             s_StrBld.Append(", ");
                         }
 

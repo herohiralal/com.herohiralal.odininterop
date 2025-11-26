@@ -78,8 +78,11 @@ namespace OdinInterop
 
         public static implicit operator String8(string str)
         {
-            // TODO
-            return default;
+            var b = System.Text.Encoding.UTF8.GetBytes(str);
+            var s = EngineBindings.UnityOdnTropInternalAllocateString8(b.Length);
+            for (int i = 0; i < b.Length; i++)
+                s.ptr[i] = b[i];
+            return s;
         }
 
         public override string ToString()
@@ -111,8 +114,10 @@ namespace OdinInterop
 
         public static implicit operator String16(string str)
         {
-            // TODO
-            return default;
+            var s = EngineBindings.UnityOdnTropInternalAllocateString16(str.Length);
+            for (int i = 0; i < str.Length; i++)
+                s.ptr[i] = str[i];
+            return s;
         }
 
         public override string ToString()

@@ -12,6 +12,80 @@ namespace OdinInterop
     [GenerateOdinInterop]
     internal static unsafe partial class EngineBindings
     {
+        private static HideFlags GetObjectHideFlags(ObjectHandle<Object> obj)
+        {
+            return obj ? obj.value.hideFlags : HideFlags.None;
+        }
+
+        private static void SetObjectHideFlags(ObjectHandle<Object> obj, HideFlags flags)
+        {
+            if (obj)
+                obj.value.hideFlags = flags;
+        }
+
+        private static String8 GetObjectName(ObjectHandle<Object> obj)
+        {
+            if (obj)
+                return obj.value.name;
+            else
+                return "";
+        }
+
+        private static void SetObjectName(ObjectHandle<Object> obj, String8 name)
+        {
+            if (obj)
+                obj.value.name = name.ToString();
+        }
+
+        private static void DestroyObject(ObjectHandle<Object> obj)
+        {
+            if (obj)
+                Object.Destroy(obj.value);
+        }
+
+        private static void DestroyObjectImmediate(ObjectHandle<Object> obj, bool allowDestroyingAssets = default)
+        {
+            if (obj)
+                Object.DestroyImmediate(obj.value, allowDestroyingAssets);
+        }
+
+        private static void DontDestroyObjectOnLoad(ObjectHandle<Object> obj)
+        {
+            if (obj)
+                Object.DontDestroyOnLoad(obj.value);
+        }
+
+        private static ObjectHandle<Object> InstantiateObjectWithoutTransform(
+            ObjectHandle<Object> original,
+            ObjectHandle<Transform> parent = default,
+            bool instantiateInWorldSpace = default
+        )
+        {
+            if (!original)
+                return default;
+
+            if (parent)
+                return Object.Instantiate(original, parent, instantiateInWorldSpace);
+            else
+                return Object.Instantiate(original);
+        }
+
+        private static ObjectHandle<Object> InstantiateObjectWithTransform(
+            ObjectHandle<Object> original,
+            Vector3 position,
+            Quaternion rotation,
+            ObjectHandle<Transform> parent = default
+        )
+        {
+            if (!original)
+                return default;
+
+            if (parent)
+                return Object.Instantiate(original, position, rotation, parent);
+            else
+                return Object.Instantiate(original, position, rotation);
+        }
+
         private static void* UnityOdnTropInternalMalloc(long size, int alignment, UnityAllocator allocator)
         {
             return UnsafeUtility.Malloc(size, alignment, allocator);
@@ -123,15 +197,7 @@ namespace OdinInterop
             return Random.Range(int.MinValue, int.MaxValue);
         }
 
-        private static HideFlags GetObjectHideFlags(ObjectHandle<Object> obj)
-        {
-            return obj ? obj.value.hideFlags : HideFlags.None;
-        }
-
-        private static void SetObjectHideFlags(ObjectHandle<Object> obj, HideFlags flags)
-        {
-            if (obj)
-                obj.value.hideFlags = flags;
-        }
+        public static partial String8 UnityOdnTropInternalAllocateString8(int length);
+        public static partial String16 UnityOdnTropInternalAllocateString16(int length);
     }
 }
