@@ -157,7 +157,7 @@ namespace OdinInterop.Editor
                         s_StrBldIndent++;
                         s_StrBld
                             .AppendIndent()
-                            .AppendLine("context = runtime.default_context() if G_OdnTrop_Internal_CtxNesting == 0 else G_OdnTrop_Internal_Ctx")
+                            .AppendLine("context = CreateUnityContext() if G_OdnTrop_Internal_CtxNesting == 0 else G_OdnTrop_Internal_Ctx")
                             .AppendIndent()
                             .AppendLine("G_OdnTrop_Internal_CtxNesting += 1")
                             .AppendIndent()
@@ -235,6 +235,14 @@ namespace OdinInterop.Editor
 
                     // actual function that the fucking user can call
                     {
+                        if (exportedFn.Name.StartsWith("UnityOdnTropInternal"))
+                        {
+                            // internal stuff
+                            s_StrBld
+                                .AppendIndent()
+                                .AppendLine("@(private = \"file\")");
+                        }
+
                         s_StrBld
                             .AppendIndent()
                             .Append($"{cleanTyName}{underScoreIfCleanTyName}{exportedFn.Name} :: proc(");
@@ -278,6 +286,11 @@ namespace OdinInterop.Editor
                         s_StrBldIndent--;
                         s_StrBld.AppendIndent().AppendLine("}").AppendLine();
                     }
+                }
+
+                if (t == typeof(EngineBindings))
+                {
+                    s_StrBld.Append(InteropGeneratorInbuiltFiles.ENGINE_BINDINGS_APPEND);
                 }
 
                 File.WriteAllText(tgtFile, s_StrBld.ToString());
@@ -368,6 +381,11 @@ namespace OdinInterop.Editor
         {
             if (t.IsPointer || t.IsByRef)
             {
+                if (t == typeof(void*))
+                {
+                    return sb.Append("rawptr");
+                }
+
                 sb.Append("^");
                 sb.AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
                 return sb;

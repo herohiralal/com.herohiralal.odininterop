@@ -582,7 +582,7 @@ namespace OdinInterop.SourceGenerator
                     else if (fullName == "UnityEngine.Color") s = "UnityEngine.Color";
                     else if (fullName.StartsWith("OdinInterop.Slice")) s = fullName;
                     else if (fullName.StartsWith("OdinInterop.DynamicArray")) s = fullName;
-                    else if (fullName == "OdinInterop.String8") s = "OdinInterop.String";
+                    else if (fullName == "OdinInterop.String8") s = "OdinInterop.String8";
                     else if (fullName == "OdinInterop.String16") s = "OdinInterop.String16";
                     else if (type.TypeKind == TypeKind.Enum) // enum
                     {
