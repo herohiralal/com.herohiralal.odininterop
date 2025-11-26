@@ -59,50 +59,18 @@ when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 	IUnityMemoryManager :: struct {
 		CreateAllocator:  proc "std" (areaName, objectName: cstring) -> ^UnityAllocator,
 		DestroyAllocator: proc "std" (allocator: ^UnityAllocator),
-		Allocate:         proc "std" (
-			allocator: ^UnityAllocator,
-			size, align: uint,
-			file: cstring,
-			line: i32,
-		) -> rawptr,
-		Deallocate:       proc "std" (
-			allocator: ^UnityAllocator,
-			ptr: rawptr,
-			file: cstring,
-			line: i32,
-		),
-		Reallocate:       proc "std" (
-			allocator: ^UnityAllocator,
-			ptr: rawptr,
-			size, align: uint,
-			file: cstring,
-			line: i32,
-		) -> rawptr,
+		Allocate:         proc "std" (allocator: ^UnityAllocator, size, align: uint, file: cstring, line: i32) -> rawptr,
+		Deallocate:       proc "std" (allocator: ^UnityAllocator, ptr: rawptr, file: cstring, line: i32),
+		Reallocate:       proc "std" (allocator: ^UnityAllocator, ptr: rawptr, size, align: uint, file: cstring, line: i32) -> rawptr,
 	}
 } else {
 	@(private = "file")
 	IUnityMemoryManager :: struct {
 		CreateAllocator:  proc "c" (areaName, objectName: cstring) -> ^UnityAllocator,
 		DestroyAllocator: proc "c" (allocator: ^UnityAllocator),
-		Allocate:         proc "c" (
-			allocator: ^UnityAllocator,
-			size, align: uint,
-			file: cstring,
-			line: i32,
-		) -> rawptr,
-		Deallocate:       proc "c" (
-			allocator: ^UnityAllocator,
-			ptr: rawptr,
-			file: cstring,
-			line: i32,
-		),
-		Reallocate:       proc "c" (
-			allocator: ^UnityAllocator,
-			ptr: rawptr,
-			size, align: uint,
-			file: cstring,
-			line: i32,
-		) -> rawptr,
+		Allocate:         proc "c" (allocator: ^UnityAllocator, size, align: uint, file: cstring, line: i32) -> rawptr,
+		Deallocate:       proc "c" (allocator: ^UnityAllocator, ptr: rawptr, file: cstring, line: i32),
+		Reallocate:       proc "c" (allocator: ^UnityAllocator, ptr: rawptr, size, align: uint, file: cstring, line: i32) -> rawptr,
 	}
 }
 
@@ -267,101 +235,29 @@ UnityProfilerCounterStatePtrCallback :: proc "c" (userData: rawptr)
 when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 	@(private = "file")
 	IUnityProfilerV2 :: struct {
-		EmitEvent:             proc "std" (
-			markerDesc: ^UnityProfilerMarkerDesc,
-			eventType: UnityProfilerMarkerEventType,
-			eventDataCount: u16,
-			eventData: ^UnityProfilerMarkerData,
-		),
+		EmitEvent:             proc "std" (markerDesc: ^UnityProfilerMarkerDesc, eventType: UnityProfilerMarkerEventType, eventDataCount: u16, eventData: ^UnityProfilerMarkerData),
 		IsEnabled:             proc "std" () -> b32,
 		IsAvailable:           proc "std" () -> b32,
-		CreateMarker:          proc "std" (
-			desc: ^^UnityProfilerMarkerDesc,
-			name: cstring,
-			category: UnityProfilerCategoryId,
-			flags: UnityProfilerMarkerFlags,
-			eventDataCount: i32,
-		) -> i32,
-		SetMarkerMetadataName: proc "std" (
-			desc: ^UnityProfilerMarkerDesc,
-			index: i32,
-			metadataName: cstring,
-			metadataType: UnityProfilerMarkerDataType,
-			metadataUnit: UnityProfilerMarkerDataUnit,
-		) -> i32,
-		CreateCategory:        proc "std" (
-			category: ^UnityProfilerCategoryId,
-			name: cstring,
-			unused: u32,
-		) -> i32,
-		RegisterThread:        proc "std" (
-			threadId: ^UnityProfilerThreadId,
-			groupName: cstring,
-			name: cstring,
-		) -> i32,
+		CreateMarker:          proc "std" (desc: ^^UnityProfilerMarkerDesc, name: cstring, category: UnityProfilerCategoryId, flags: UnityProfilerMarkerFlags, eventDataCount: i32) -> i32,
+		SetMarkerMetadataName: proc "std" (desc: ^UnityProfilerMarkerDesc, index: i32, metadataName: cstring, metadataType: UnityProfilerMarkerDataType, metadataUnit: UnityProfilerMarkerDataUnit) -> i32,
+		CreateCategory:        proc "std" (category: ^UnityProfilerCategoryId, name: cstring, unused: u32) -> i32,
+		RegisterThread:        proc "std" (threadId: ^UnityProfilerThreadId, groupName: cstring, name: cstring) -> i32,
 		UnregisterThread:      proc "std" (threadId: UnityProfilerThreadId) -> i32,
-		CreateCounterValue:    proc "std" (
-			category: UnityProfilerCategoryId,
-			name: cstring,
-			flags: UnityProfilerMarkerFlags,
-			valueType: UnityProfilerMarkerDataType,
-			valueUnit: UnityProfilerMarkerDataUnit,
-			valueSize: uint,
-			counterFlags: UnityProfilerCounterFlags,
-			activateFunc: UnityProfilerCounterStatePtrCallback,
-			deactivateFunc: UnityProfilerCounterStatePtrCallback,
-			userData: rawptr,
-		) -> rawptr,
+		CreateCounterValue:    proc "std" (category: UnityProfilerCategoryId, name: cstring, flags: UnityProfilerMarkerFlags, valueType: UnityProfilerMarkerDataType, valueUnit: UnityProfilerMarkerDataUnit, valueSize: uint, counterFlags: UnityProfilerCounterFlags, activateFunc: UnityProfilerCounterStatePtrCallback, deactivateFunc: UnityProfilerCounterStatePtrCallback, userData: rawptr) -> rawptr,
 		FlushCounterValue:     proc "std" (counter: rawptr),
 	}
 } else {
 	@(private = "file")
 	IUnityProfilerV2 :: struct {
-		EmitEvent:             proc "c" (
-			markerDesc: ^UnityProfilerMarkerDesc,
-			eventType: UnityProfilerMarkerEventType,
-			eventDataCount: u16,
-			eventData: ^UnityProfilerMarkerData,
-		),
+		EmitEvent:             proc "c" (markerDesc: ^UnityProfilerMarkerDesc, eventType: UnityProfilerMarkerEventType, eventDataCount: u16, eventData: ^UnityProfilerMarkerData),
 		IsEnabled:             proc "c" () -> b32,
 		IsAvailable:           proc "c" () -> b32,
-		CreateMarker:          proc "c" (
-			desc: ^^UnityProfilerMarkerDesc,
-			name: cstring,
-			category: UnityProfilerCategoryId,
-			flags: UnityProfilerMarkerFlags,
-			eventDataCount: i32,
-		) -> i32,
-		SetMarkerMetadataName: proc "c" (
-			desc: ^UnityProfilerMarkerDesc,
-			index: i32,
-			metadataName: cstring,
-			metadataType: UnityProfilerMarkerDataType,
-			metadataUnit: UnityProfilerMarkerDataUnit,
-		) -> i32,
-		CreateCategory:        proc "c" (
-			category: ^UnityProfilerCategoryId,
-			name: cstring,
-			unused: u32,
-		) -> i32,
-		RegisterThread:        proc "c" (
-			threadId: ^UnityProfilerThreadId,
-			groupName: cstring,
-			name: cstring,
-		) -> i32,
+		CreateMarker:          proc "c" (desc: ^^UnityProfilerMarkerDesc, name: cstring, category: UnityProfilerCategoryId, flags: UnityProfilerMarkerFlags, eventDataCount: i32) -> i32,
+		SetMarkerMetadataName: proc "c" (desc: ^UnityProfilerMarkerDesc, index: i32, metadataName: cstring, metadataType: UnityProfilerMarkerDataType, metadataUnit: UnityProfilerMarkerDataUnit) -> i32,
+		CreateCategory:        proc "c" (category: ^UnityProfilerCategoryId, name: cstring, unused: u32) -> i32,
+		RegisterThread:        proc "c" (threadId: ^UnityProfilerThreadId, groupName: cstring, name: cstring) -> i32,
 		UnregisterThread:      proc "c" (threadId: UnityProfilerThreadId) -> i32,
-		CreateCounterValue:    proc "c" (
-			category: UnityProfilerCategoryId,
-			name: cstring,
-			flags: UnityProfilerMarkerFlags,
-			valueType: UnityProfilerMarkerDataType,
-			valueUnit: UnityProfilerMarkerDataUnit,
-			valueSize: uint,
-			counterFlags: UnityProfilerCounterFlags,
-			activateFunc: UnityProfilerCounterStatePtrCallback,
-			deactivateFunc: UnityProfilerCounterStatePtrCallback,
-			userData: rawptr,
-		) -> rawptr,
+		CreateCounterValue:    proc "c" (category: UnityProfilerCategoryId, name: cstring, flags: UnityProfilerMarkerFlags, valueType: UnityProfilerMarkerDataType, valueUnit: UnityProfilerMarkerDataUnit, valueSize: uint, counterFlags: UnityProfilerCounterFlags, activateFunc: UnityProfilerCounterStatePtrCallback, deactivateFunc: UnityProfilerCounterStatePtrCallback, userData: rawptr) -> rawptr,
 		FlushCounterValue:     proc "c" (counter: rawptr),
 	}
 }
@@ -372,30 +268,50 @@ IUnityProfilerV2GUID: UnityInterfaceGUID : {high = 0xB957E0189CB6A30B, low = 0x8
 
 // UNITY INTERFACES END HERE ========================================================================
 
-// KEEP IN SYNC WITH `StoredState` IN `Binder.c` AND `OdinCompiler.cs`!!!!!
-@(private = "file")
-StoredState :: struct {
-	unityInterfaces: ^IUnityInterfaces,
-	libHandle:       rawptr, // handle of self loaded library
-
-	// all the native stuff starts here
-	initialised:     b64,
-}
-
-#assert(size_of(StoredState) <= 1024) // ensure we have enough space for future use
-#assert(align_of(StoredState) == 8)
-
 // all thet global state
 @(private = "file")
 G_GlobalState: struct {
 	interfaces: ^IUnityInterfaces,
+	logger:     ^IUnityLog,
+	profiler:   ^IUnityProfilerV2,
+	cached:     CachedState,
 } = {}
 
+CachedState :: struct {
+	// all cached state goes here
+	// on editor, this will be cached to maintain between hot reloads
+	// stuff like created allocators/profiler markers can go here
+	// ANY CHANGE TO THIS WILL REQUIRE EDITOR RESTART
+}
+
 when UNITY_EDITOR {
+
+	// KEEP IN SYNC WITH `StoredState` IN `Binder.c` AND `OdinCompiler.cs`!!!!!
+	// DO NOT CHANGE
+	@(private = "file")
+	EditorStoredState :: struct {
+		unityInterfaces: ^IUnityInterfaces,
+		libHandle:       rawptr, // handle of self loaded library
+
+		// all the native stuff starts here
+		initialised:     b64,
+		cached:          CachedState,
+	}
+
+	#assert(size_of(EditorStoredState) <= 1024) // ensure we have enough space for future use
+	#assert(align_of(EditorStoredState) == 8)
+
 	@(export)
 	@(private = "file")
-	UnityOdnTropInternalSetUnityInterfacesPtr :: proc "c" (ptr: ^StoredState) {
+	UnityOdnTropInternalInitialiseForEditor :: proc "c" (ptr: ^EditorStoredState) {
 		G_GlobalState.interfaces = ptr.unityInterfaces
+		UnityOdnTropInternalStaticInitialise()
+
+		if !ptr.initialised {
+			UnityOdnTropInternalInitialiseCachedState()
+			ptr.cached = G_GlobalState.cached
+			ptr.initialised = true
+		}
 	}
 } else {
 	when UNITY_STANDALONE_WIN {
@@ -403,11 +319,14 @@ when UNITY_EDITOR {
 		@(private = "file")
 		UnityPluginLoad :: proc "std" (ptr: ^IUnityInterfaces) {
 			G_GlobalState.interfaces = ptr
+			UnityOdnTropInternalStaticInitialise()
+			UnityOdnTropInternalInitialiseCachedState()
 		}
 
 		@(export)
 		@(private = "file")
 		UnityPluginUnload :: proc "std" () {
+			UnityOdnTropInternalShutdownCachedState()
 			G_GlobalState = {}
 		}
 	} else {
@@ -415,12 +334,29 @@ when UNITY_EDITOR {
 		@(private = "file")
 		UnityPluginLoad :: proc "c" (ptr: ^IUnityInterfaces) {
 			G_GlobalState.interfaces = ptr
+			UnityOdnTropInternalInitialiseCachedState()
+			UnityOdnTropInternalStaticInitialise()
 		}
 
 		@(export)
 		@(private = "file")
 		UnityPluginUnload :: proc "c" () {
+			UnityOdnTropInternalShutdownCachedState()
 			G_GlobalState = {}
 		}
 	}
+}
+
+@(private = "file")
+UnityOdnTropInternalStaticInitialise :: proc "contextless" () {
+	// only do here things that are safe and don't require any caching
+
+	G_GlobalState.logger = cast(^IUnityLog)(G_GlobalState.interfaces.GetInterface(IUnityLogGUID))
+	G_GlobalState.profiler = cast(^IUnityProfilerV2)(G_GlobalState.interfaces.GetInterface(IUnityProfilerV2GUID))
+}
+
+UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
+}
+
+UnityOdnTropInternalShutdownCachedState :: proc "contextless" () {
 }

@@ -151,7 +151,7 @@ namespace OdinInterop.Editor
                 return;
             }
 
-            LibraryUtils.GetDelegate<SetUnityInterfacesPtrDelegate>(libraryHandle, "UnityOdnTropInternalSetUnityInterfacesPtr")?.Invoke(StoredState.GetPtr());
+            LibraryUtils.GetDelegate<SetUnityInterfacesPtrDelegate>(libraryHandle, "UnityOdnTropInternalInitialiseForEditor")?.Invoke(StoredState.GetPtr());
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
 
