@@ -12,3 +12,7 @@ if errorlevel 1 (
 )
 
 cl.exe /std:c11 /Fe:../../../Plugins/Editor/OdinInteropBinder.dll /LD ./Binder.c
+
+if exist ..\..\..\Plugins\Editor\OdinInteropBinder.exp del ..\..\..\Plugins\Editor\OdinInteropBinder.exp
+if exist ..\..\..\Plugins\Editor\OdinInteropBinder.lib del ..\..\..\Plugins\Editor\OdinInteropBinder.lib
+if exist Binder.obj del Binder.obj

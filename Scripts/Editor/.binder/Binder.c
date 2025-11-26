@@ -12,18 +12,19 @@
     #define EXPORT_API
 #endif
 
-void* G_UnityInterfaces = 0;
+// KEEP IN SYNC WITH `StoredState` IN `UnityInterfaces.odin` AND `OdinCompiler.cs`!!!!!
+typedef struct StoredState
+{
+    void* unityInterfaces;
+    unsigned long long data[127]; // 1KiB of state
+} StoredState;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+_Static_assert(sizeof(StoredState) == 1024, "StoredState size must be 512 bytes plus pointer size");
 
-void EXPORT_API INTERFACE_API UnityPluginLoad(void* unityInterfaces) { G_UnityInterfaces = unityInterfaces; }
+StoredState G_StateToStore = {0};
 
-void EXPORT_API INTERFACE_API UnityPluginUnload() { G_UnityInterfaces = 0; }
+void EXPORT_API INTERFACE_API UnityPluginLoad(void* unityInterfaces) { G_StateToStore.unityInterfaces = unityInterfaces; }
 
-unsigned long long EXPORT_API OdinInteropBinder_GetUnityInterfaces(void) { return (unsigned long long) G_UnityInterfaces; }
+void EXPORT_API INTERFACE_API UnityPluginUnload(void) { G_StateToStore.unityInterfaces = 0; }
 
-#ifdef __cplusplus
-}
-#endif
+unsigned long long EXPORT_API OdinInteropBinder_GetStoredState(void) { return (unsigned long long) &G_StateToStore; }

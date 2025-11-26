@@ -44,7 +44,7 @@ namespace OdinInterop.Editor
                     var tgtFileName = Path.GetFileName(f);
                     if (tgtFileName == "stubs.odin") continue; // only for satisfying the lsp
 
-                    tgtFileName = "odntrop_" + tgtFileName;
+                    tgtFileName = "odntrop_internal_" + tgtFileName;
                     var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, tgtFileName));
                     File.Copy(f, tgtFile);
                 }

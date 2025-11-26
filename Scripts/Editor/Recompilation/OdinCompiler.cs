@@ -85,16 +85,43 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_IOS_PLUGIN_DIR_PATH = Path.Combine(ODIN_PLUGIN_DIR_PATH, "iOS");
         public static readonly string ODIN_IOS_PLUGIN_PATH = Path.Combine(ODIN_IOS_PLUGIN_DIR_PATH, "libOdinInterop.a");
 
+        private unsafe struct RawStoredState
+        {
+            public fixed ulong data[128]; // 1KiB of state
+        }
+
+        private unsafe struct StoredState
+        {
+            /**
+             * any change to this must be accompanied with restarting the editor
+             * because this is stored in a weird way inside the binder C code
+             * Also KEEP IN SYNC WITH `UnityInterfaces.odin` AND `Binder.c`!!!!!
+             */
+
+            public IntPtr unityInterfaces;
+            public IntPtr libHandle;
+
+            static StoredState()
+            {
+                if (sizeof(StoredState) > sizeof(RawStoredState))
+                {
+                    throw new Exception("StoredState size exceeds RawStoredState size. Please update accordingly.");
+                }
+            }
+
+            [DllImport("OdinInteropBinder", CallingConvention = CallingConvention.Cdecl, EntryPoint = "OdinInteropBinder_GetStoredState")]
+            public static extern RawStoredState* GetPtr();
+
+            public static ref StoredState value => ref *(StoredState*)GetPtr();
+        }
+
         [InitializeOnLoadMethod]
         private static void InitialiseEditor()
         {
-            /**
-             * because of how unity domain reload works, we don't know if we've previously loaded this native lib
-             * so we just always load+unload it to clear up any dangling references
-             */
-            if (File.Exists(ODIN_LIB_EDITOR_OUTPUT_PATH))
+            // remove if there's a loaded library from before
+            if (StoredState.value.libHandle != IntPtr.Zero)
             {
-                LibraryUtils.CloseLibraryIfLoaded(ODIN_LIB_EDITOR_OUTPUT_PATH);
+                LibraryUtils.CloseLibrary(StoredState.value.libHandle);
             }
 
             InteropGenerator.GenerateInteropCode();
@@ -102,7 +129,7 @@ namespace OdinInterop.Editor
         }
 
         [MenuItem("Tools/Odin Interop/Hot Reload %&R")]
-        public static void HotReload()
+        public static unsafe void HotReload()
         {
             if (OdinCompilerUtils.libraryHandle != IntPtr.Zero)
             {
@@ -117,19 +144,18 @@ namespace OdinInterop.Editor
             }
 
             var libraryHandle = LibraryUtils.OpenLibrary(ODIN_LIB_EDITOR_OUTPUT_PATH);
+            StoredState.value.libHandle = libraryHandle;
             if (libraryHandle == IntPtr.Zero)
             {
                 Debug.LogError("[OdinCompiler]: Failed to load compiled OdinInteropEditor library. No active library present.");
                 return;
             }
 
-            LibraryUtils.GetDelegate<SetUnityInterfacesPtrDelegate>(libraryHandle, "UnityOdnTropInternalSetUnityInterfacesPtr")?.Invoke(GetUnityInterfacesPtr());
+            LibraryUtils.GetDelegate<SetUnityInterfacesPtrDelegate>(libraryHandle, "UnityOdnTropInternalSetUnityInterfacesPtr")?.Invoke(StoredState.GetPtr());
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
 
-        [DllImport("OdinInteropBinder", CallingConvention = CallingConvention.Cdecl, EntryPoint = "OdinInteropBinder_GetUnityInterfaces")]
-        private static extern IntPtr GetUnityInterfacesPtr();
-        private delegate void SetUnityInterfacesPtrDelegate(IntPtr ptr);
+        private unsafe delegate void SetUnityInterfacesPtrDelegate(RawStoredState* ptr);
 
 
         internal static bool CompileOdinInteropLibraryForEditor()
