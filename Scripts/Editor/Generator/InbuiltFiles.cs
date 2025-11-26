@@ -8,18 +8,56 @@ namespace OdinInterop.Editor
 
 		internal const string ENGINE_BINDINGS_APPEND = @"
 UNITY_EDITOR :: #config(UNITY_EDITOR, false)
+UNITY_EDITOR_WIN :: #config(UNITY_EDITOR_WIN, false)
+UNITY_EDITOR_OSX :: #config(UNITY_EDITOR_OSX, false)
+UNITY_EDITOR_LINUX :: #config(UNITY_EDITOR_LINUX, false)
+
 UNITY_STANDALONE :: #config(UNITY_STANDALONE, false)
 UNITY_STANDALONE_WIN :: #config(UNITY_STANDALONE_WIN, false)
 UNITY_STANDALONE_OSX :: #config(UNITY_STANDALONE_OSX, false)
 UNITY_STANDALONE_LINUX :: #config(UNITY_STANDALONE_LINUX, false)
+
 UNITY_IOS :: #config(UNITY_IOS, false)
 UNITY_ANDROID :: #config(UNITY_ANDROID, false)
 
-#assert((1 if UNITY_STANDALONE else 0) + (1 if UNITY_IOS else 0) + (1 if UNITY_ANDROID else 0) == 1)
-#assert((1 if UNITY_STANDALONE_WIN else 0) + (1 if UNITY_STANDALONE_OSX else 0) + (1 if UNITY_STANDALONE_LINUX else 0) == (1 if UNITY_STANDALONE else 0))
+#assert((1 when UNITY_STANDALONE else 0) + (1 when UNITY_IOS else 0) + (1 when UNITY_ANDROID else 0) == 1)
+#assert((1 when UNITY_EDITOR_WIN else 0) + (1 when UNITY_EDITOR_OSX else 0) + (1 when UNITY_EDITOR_LINUX else 0) == (1 when UNITY_EDITOR else 0))
+#assert((1 when UNITY_STANDALONE_WIN else 0) + (1 when UNITY_STANDALONE_OSX else 0) + (1 when UNITY_STANDALONE_LINUX else 0) == (1 when UNITY_STANDALONE else 0))
 
 @thread_local @private G_OdnTrop_Internal_Ctx: runtime.Context
 @thread_local @private G_OdnTrop_Internal_CtxNesting: uint
+
+@(private = ""file"")
+G_UnityInterfacesPtr: rawptr
+
+when UNITY_EDITOR {
+	@export @(private = ""file"")
+	UnityOdnTropInternalSetUnityInterfacesPtr :: proc ""c"" (ptr: rawptr) {
+		G_UnityInterfacesPtr = ptr
+	}
+} else {
+	when UNITY_STANDALONE_WIN {
+		@export @(private = ""file"")
+		UnityPluginLoad :: proc ""std"" (ptr: rawptr) {
+			G_UnityInterfacesPtr = ptr
+		}
+
+		@export @(private = ""file"")
+		UnityPluginUnload :: proc ""std"" () {
+			G_UnityInterfacesPtr = nil
+		}
+	} else {
+		@export @(private = ""file"")
+		UnityPluginLoad :: proc ""c"" (ptr: rawptr) {
+			G_UnityInterfacesPtr = ptr
+		}
+
+		@export @(private = ""file"")
+		UnityPluginUnload :: proc ""c"" () {
+			G_UnityInterfacesPtr = nil
+		}
+	}
+}
 
 CreateUnityContext :: proc() -> runtime.Context {
 	return {

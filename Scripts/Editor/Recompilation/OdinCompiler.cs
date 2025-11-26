@@ -123,8 +123,13 @@ namespace OdinInterop.Editor
                 return;
             }
 
+            LibraryUtils.GetDelegate<SetUnityInterfacesPtrDelegate>(libraryHandle, "UnityOdnTropInternalSetUnityInterfacesPtr")?.Invoke(GetUnityInterfacesPtr());
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
         }
+
+        [DllImport("OdinInteropBinder", CallingConvention = CallingConvention.Cdecl, EntryPoint = "OdinInteropBinder_GetUnityInterfaces")]
+        private static extern IntPtr GetUnityInterfacesPtr();
+        private delegate void SetUnityInterfacesPtrDelegate(IntPtr ptr);
 
 
         internal static bool CompileOdinInteropLibraryForEditor()
