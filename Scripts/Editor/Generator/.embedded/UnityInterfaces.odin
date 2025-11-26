@@ -45,6 +45,64 @@ when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 @(private = "file")
 IUnityLogGUID: UnityInterfaceGUID : {high = 0x9E7507fA5B444D5D, low = 0x92FB979515EA83FC}
 
+@(private = "file")
+UnityAllocator :: struct {}
+
+when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
+	@(private = "file")
+	IUnityMemoryManager :: struct {
+		CreateAllocator:  proc "std" (areaName, objectName: cstring) -> ^UnityAllocator,
+		DestroyAllocator: proc "std" (allocator: ^UnityAllocator),
+		Allocate:         proc "std" (
+			allocator: ^UnityAllocator,
+			size, align: uint,
+			file: cstring,
+			line: i32,
+		) -> rawptr,
+		Deallocate:       proc "std" (
+			allocator: ^UnityAllocator,
+			ptr: rawptr,
+			file: cstring,
+			line: i32,
+		),
+		Reallocate:       proc "std" (
+			allocator: ^UnityAllocator,
+			ptr: rawptr,
+			size, align: uint,
+			file: cstring,
+			line: i32,
+		) -> rawptr,
+	}
+} else {
+	@(private = "file")
+	IUnityMemoryManager :: struct {
+		CreateAllocator:  proc "c" (areaName, objectName: cstring) -> ^UnityAllocator,
+		DestroyAllocator: proc "c" (allocator: ^UnityAllocator),
+		Allocate:         proc "c" (
+			allocator: ^UnityAllocator,
+			size, align: uint,
+			file: cstring,
+			line: i32,
+		) -> rawptr,
+		Deallocate:       proc "c" (
+			allocator: ^UnityAllocator,
+			ptr: rawptr,
+			file: cstring,
+			line: i32,
+		),
+		Reallocate:       proc "c" (
+			allocator: ^UnityAllocator,
+			ptr: rawptr,
+			size, align: uint,
+			file: cstring,
+			line: i32,
+		) -> rawptr,
+	}
+}
+
+@(private = "file")
+IUnityMemoryManagerGUID: UnityInterfaceGUID : {high = 0xBAF9E57C61A811EC, low = 0xC5A7CC7861A811EC}
+
 // KEEP IN SYNC WITH `StoredState` IN `Binder.c` AND `OdinCompiler.cs`!!!!!
 @(private = "file")
 StoredState :: struct {
@@ -60,7 +118,7 @@ StoredState :: struct {
 
 // all thet global state
 @(private = "file")
-G_StoredState: struct {
+G_GlobalState: struct {
 	interfaces: ^IUnityInterfaces,
 } = {}
 
@@ -68,32 +126,32 @@ when UNITY_EDITOR {
 	@(export)
 	@(private = "file")
 	UnityOdnTropInternalSetUnityInterfacesPtr :: proc "c" (ptr: ^StoredState) {
-		G_StoredState.interfaces = ptr.unityInterfaces
+		G_GlobalState.interfaces = ptr.unityInterfaces
 	}
 } else {
 	when UNITY_STANDALONE_WIN {
 		@(export)
 		@(private = "file")
 		UnityPluginLoad :: proc "std" (ptr: ^IUnityInterfaces) {
-			G_StoredState.interfaces = ptr
+			G_GlobalState.interfaces = ptr
 		}
 
 		@(export)
 		@(private = "file")
 		UnityPluginUnload :: proc "std" () {
-			G_StoredState = {}
+			G_GlobalState = {}
 		}
 	} else {
 		@(export)
 		@(private = "file")
 		UnityPluginLoad :: proc "c" (ptr: ^IUnityInterfaces) {
-			G_StoredState.interfaces = ptr
+			G_GlobalState.interfaces = ptr
 		}
 
 		@(export)
 		@(private = "file")
 		UnityPluginUnload :: proc "c" () {
-			G_StoredState = {}
+			G_GlobalState = {}
 		}
 	}
 }
