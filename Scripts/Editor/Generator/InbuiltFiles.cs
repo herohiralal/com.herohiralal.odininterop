@@ -24,21 +24,63 @@ UNITY_ANDROID :: #config(UNITY_ANDROID, false)
 #assert((1 when UNITY_EDITOR_WIN else 0) + (1 when UNITY_EDITOR_OSX else 0) + (1 when UNITY_EDITOR_LINUX else 0) == (1 when UNITY_EDITOR else 0))
 #assert((1 when UNITY_STANDALONE_WIN else 0) + (1 when UNITY_STANDALONE_OSX else 0) + (1 when UNITY_STANDALONE_LINUX else 0) == (1 when UNITY_STANDALONE else 0))
 
-@thread_local @private G_OdnTrop_Internal_Ctx: runtime.Context
-@thread_local @private G_OdnTrop_Internal_CtxNesting: uint
+@(private = ""file"")
+UnityInterfaceGUID :: struct {
+	high, low: u64
+}
 
 @(private = ""file"")
-G_UnityInterfacesPtr: rawptr
+IUnityInterface :: struct { }
+
+when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
+	@(private = ""file"")
+	IUnityInterfaces :: struct {
+		GetInterface: proc ""std"" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		RegisterInterface: proc ""std"" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+	}
+} else {
+	@(private = ""file"")
+	IUnityInterfaces :: struct {
+		GetInterface: proc ""c"" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		RegisterInterface: proc ""c"" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+	}
+}
+
+@(private = ""file"")
+UnityLogType :: enum {
+	Error = 0,
+	Warning = 2,
+	Log = 3,
+	Exception = 4,
+}
+
+when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
+	@(private = ""file"")
+	IUnityLog :: struct {
+		Log: proc ""std"" (ty: UnityLogType, message, fileName: cstring, line: i32),
+	}
+} else {
+	@(private = ""file"")
+	IUnityLog :: struct {
+		Log: proc ""c"" (ty: UnityLogType, message, fileName: cstring, line: i32),
+	}
+}
+
+@(private = ""file"")
+IUnityLogGUID: UnityInterfaceGUID : { high = 0x9E7507fA5B444D5D, low = 0x92FB979515EA83FC }
+
+@(private = ""file"")
+G_UnityInterfacesPtr: ^IUnityInterfaces
 
 when UNITY_EDITOR {
 	@export @(private = ""file"")
-	UnityOdnTropInternalSetUnityInterfacesPtr :: proc ""c"" (ptr: rawptr) {
+	UnityOdnTropInternalSetUnityInterfacesPtr :: proc ""c"" (ptr: ^IUnityInterfaces) {
 		G_UnityInterfacesPtr = ptr
 	}
 } else {
 	when UNITY_STANDALONE_WIN {
 		@export @(private = ""file"")
-		UnityPluginLoad :: proc ""std"" (ptr: rawptr) {
+		UnityPluginLoad :: proc ""std"" (ptr: ^IUnityInterfaces) {
 			G_UnityInterfacesPtr = ptr
 		}
 
@@ -48,7 +90,7 @@ when UNITY_EDITOR {
 		}
 	} else {
 		@export @(private = ""file"")
-		UnityPluginLoad :: proc ""c"" (ptr: rawptr) {
+		UnityPluginLoad :: proc ""c"" (ptr: ^IUnityInterfaces) {
 			G_UnityInterfacesPtr = ptr
 		}
 
@@ -58,6 +100,9 @@ when UNITY_EDITOR {
 		}
 	}
 }
+
+@thread_local @private G_OdnTrop_Internal_Ctx: runtime.Context
+@thread_local @private G_OdnTrop_Internal_CtxNesting: uint
 
 CreateUnityContext :: proc() -> runtime.Context {
 	return {
