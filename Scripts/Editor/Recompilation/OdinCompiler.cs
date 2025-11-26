@@ -137,6 +137,37 @@ namespace OdinInterop.Editor
             {
                 $"-out:{ODIN_LIB_EDITOR_OUTPUT_PATH}",
                 "-build-mode:dynamic",
+#if UNITY_EDITOR
+                "-define:UNITY_EDITOR=true",
+#if false
+#elif UNITY_EDITOR_WIN
+                "-define:UNITY_EDITOR_WIN=true",
+#elif UNITY_EDITOR_OSX
+                "-define:UNITY_EDITOR_OSX=true",
+#elif UNITY_EDITOR_LINUX
+                "-define:UNITY_EDITOR_LINUX=true",
+#endif
+
+#endif
+
+#if false
+#elif UNITY_ANDROID
+                "-define:UNITY_ANDROID=true",
+#elif UNITY_IOS
+                "-define:UNITY_IOS=true",
+#elif UNITY_STANDALONE
+                "-define:UNITY_STANDALONE=true",
+
+#if false
+#elif UNITY_STANDALONE_WIN
+                "-define:UNITY_STANDALONE_WIN=true",
+#elif UNITY_STANDALONE_OSX
+                "-define:UNITY_STANDALONE_OSX=true",
+#elif UNITY_STANDALONE_LINUX
+                "-define:UNITY_STANDALONE_LINUX=true",
+#endif
+
+#endif
             });
         }
 
@@ -150,6 +181,8 @@ namespace OdinInterop.Editor
             {
                 $"-out:{ODIN_WINDOWS_PLUGIN_PATH}",
                 "-build-mode:dynamic",
+                "-define:UNITY_STANDALONE=true",
+                "-define:UNITY_STANDALONE_WIN=true",
             };
 
             return RunOdinCompiler(l, isRelease: isRelease);
@@ -173,6 +206,8 @@ namespace OdinInterop.Editor
                 $"-out:{ODIN_OSX_ARM64_SO_PATH}",
                 "-target:darwin_arm64",
                 "-build-mode:dynamic",
+                "-define:UNITY_STANDALONE=true",
+                "-define:UNITY_STANDALONE_OSX=true",
             }, isRelease: isRelease);
 
             var x8664Success = RunOdinCompiler(new List<string>
@@ -180,6 +215,8 @@ namespace OdinInterop.Editor
                 $"-out:{ODIN_OSX_X8664_SO_PATH}",
                 "-target:darwin_amd64",
                 "-build-mode:dynamic",
+                "-define:UNITY_STANDALONE=true",
+                "-define:UNITY_STANDALONE_OSX=true",
             }, isRelease: isRelease);
 
             if (!arm64Success || !x8664Success) return false;
@@ -219,6 +256,7 @@ namespace OdinInterop.Editor
                     "-target:darwin_arm64",
                     "-build-mode:object",
                     "-subtarget:iphone",
+                    "-define:UNITY_IOS=true",
                 };
 
                 var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
@@ -269,6 +307,7 @@ namespace OdinInterop.Editor
                     "-target:darwin_arm64",
                     "-build-mode:object",
                     "-subtarget:iphonesimulator",
+                    "-define:UNITY_IOS=true",
                 };
 
                 var arm64CompilationSuccess = RunOdinCompiler(arm64L, isRelease: isRelease);
@@ -280,6 +319,7 @@ namespace OdinInterop.Editor
                     "-target:darwin_amd64",
                     "-build-mode:object",
                     "-subtarget:iphonesimulator",
+                    "-define:UNITY_IOS=true",
                 };
 
                 var x8664CompilationSuccess = RunOdinCompiler(x8664L, isRelease: isRelease);
@@ -402,6 +442,7 @@ namespace OdinInterop.Editor
                     $"-target:{odnPlatform}",
                     // "-subtarget:android", armv7/x64 aren't supported by odin so trying it out without that stuff
                     "-build-mode:object",
+                    "-define:UNITY_ANDROID=true",
                 };
 
                 var d = new Dictionary<string, string>
@@ -495,6 +536,8 @@ namespace OdinInterop.Editor
                 $"-target:linux_amd64",
                 "-build-mode:object",
                 "-no-entry-point",
+                "-define:UNITY_STANDALONE=true",
+                "-define:UNITY_STANDALONE_LINUX=true",
             };
 
             var compilationSuccess = RunOdinCompiler(l, isRelease: isRelease);
@@ -517,6 +560,8 @@ namespace OdinInterop.Editor
                     "-o", ODIN_LINUX_PLUGIN_PATH,
                     ODIN_LINUX_OBJ_PATH,
                     $"-fuse-ld={Path.Combine(execsPath, "bin", "ld.lld")}",
+                    "-Wl,-init,'_odin_entry_point'",
+                    "-Wl,-fini,'_odin_exit_point'",
                 },
                 null,
                 ODIN_LIB_INPUT_PATH,
