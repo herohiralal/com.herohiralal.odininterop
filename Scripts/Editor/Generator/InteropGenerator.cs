@@ -35,6 +35,21 @@ namespace OdinInterop.Editor
                 }
             }
 
+            // some hand-coded files
+            {
+                var p = Path.GetFullPath("Packages/com.herohiralal.odininterop/");
+                p = Path.Combine(p, "Scripts", "Editor", "Generator", ".embedded");
+                foreach (var f in Directory.GetFiles(p, "*.odin", SearchOption.TopDirectoryOnly))
+                {
+                    var tgtFileName = Path.GetFileName(f);
+                    if (tgtFileName == "stubs.odin") continue; // only for satisfying the lsp
+
+                    tgtFileName = "odntrop_" + tgtFileName;
+                    var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, tgtFileName));
+                    File.Copy(f, tgtFile);
+                }
+            }
+
             foreach (var (n, c) in InteropGeneratorInbuiltFiles.files)
             {
                 var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{n}"));
