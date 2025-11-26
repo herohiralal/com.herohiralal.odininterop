@@ -1,5 +1,8 @@
 package src
 
+import "base:runtime"
+import "core:strings"
+
 // IUnityInterface.h ================================================================================
 
 @(private = "file")
@@ -49,10 +52,10 @@ when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 @(private = "file")
 IUnityLogGUID: UnityInterfaceGUID : {high = 0x9E7507fA5B444D5D, low = 0x92FB979515EA83FC}
 
+// IUnityMemoryManager.h ============================================================================
+
 @(private = "file")
 UnityAllocator :: struct {}
-
-// IUnityMemoryManager.h ============================================================================
 
 when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 	@(private = "file")
@@ -271,10 +274,11 @@ IUnityProfilerV2GUID: UnityInterfaceGUID : {high = 0xB957E0189CB6A30B, low = 0x8
 // all thet global state
 @(private = "file")
 G_GlobalState: struct {
-	interfaces: ^IUnityInterfaces,
-	logger:     ^IUnityLog,
-	profiler:   ^IUnityProfilerV2,
-	cached:     CachedState,
+	interfaces:    ^IUnityInterfaces,
+	logger:        ^IUnityLog,
+	profiler:      ^IUnityProfilerV2,
+	memoryManager: ^IUnityMemoryManager,
+	cached:        CachedState,
 } = {}
 
 CachedState :: struct {
@@ -282,6 +286,7 @@ CachedState :: struct {
 	// on editor, this will be cached to maintain between hot reloads
 	// stuff like created allocators/profiler markers can go here
 	// ANY CHANGE TO THIS WILL REQUIRE EDITOR RESTART
+	heapAllocator: ^UnityAllocator,
 }
 
 when UNITY_EDITOR {
@@ -353,10 +358,150 @@ UnityOdnTropInternalStaticInitialise :: proc "contextless" () {
 
 	G_GlobalState.logger = cast(^IUnityLog)(G_GlobalState.interfaces.GetInterface(IUnityLogGUID))
 	G_GlobalState.profiler = cast(^IUnityProfilerV2)(G_GlobalState.interfaces.GetInterface(IUnityProfilerV2GUID))
+	G_GlobalState.memoryManager = cast(^IUnityMemoryManager)(G_GlobalState.interfaces.GetInterface(IUnityMemoryManagerGUID))
 }
 
 UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
+	G_GlobalState.cached.heapAllocator = G_GlobalState.memoryManager.CreateAllocator("OdinInterop", "HeapAllocator")
 }
 
 UnityOdnTropInternalShutdownCachedState :: proc "contextless" () {
+	G_GlobalState.memoryManager.DestroyAllocator(G_GlobalState.cached.heapAllocator)
+}
+
+UNITY_MAIN_ALLOCATOR: runtime.Allocator : {procedure = OdnTrop_Internal_DefaultHeapAllocatorFunc, data = nil}
+
+UNITY_MAIN_LOGGER: runtime.Logger : {procedure = OdnTrop_Internal_MainLogFunc, lowest_level = .Info, options = {.Date, .Short_File_Path, .Level, .Date, .Time, .Procedure}, data = nil}
+
+@(private = "file")
+OdnTrop_Internal_DefaultHeapAllocatorFunc :: proc(allocatorData: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, oldMemory: rawptr, oldSize: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+	// majorly from - https://github.com/odin-lang/Odin/blob/fd442b8678baa63be60c3c555d6063386e1d7453/base/runtime/heap_allocator.odin
+	// The heap doesn't respect alignment.
+	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
+	// padding. We also store the original pointer returned by heap_alloc right before
+	// the pointer we return to the user.
+
+	fileCStr := strings.clone_to_cstring(loc.file_path, UNITY_DEFAULT_TEMP_ALLOCATOR)
+
+	HeapResize :: proc(ptr: rawptr, oldSize: int, newSize: int, alignment: u32, fileCStr: cstring, line: i32) -> rawptr {
+		if newSize == 0 {
+			G_GlobalState.memoryManager.Deallocate(G_GlobalState.cached.heapAllocator, ptr, fileCStr, line)
+			return nil
+		}
+
+		if ptr == nil {
+			return G_GlobalState.memoryManager.Allocate(G_GlobalState.cached.heapAllocator, auto_cast newSize, auto_cast alignment, fileCStr, line)
+		}
+
+		return G_GlobalState.memoryManager.Reallocate(G_GlobalState.cached.heapAllocator, ptr, auto_cast newSize, auto_cast alignment, fileCStr, line)
+	}
+
+	AlignedAlloc :: proc(size, alignment: int, oldPtr: rawptr, oldSize: int, zeroMem: bool, fileCStr: cstring, line: i32) -> ([]byte, runtime.Allocator_Error) {
+		a := alignment > align_of(rawptr) ? alignment : align_of(rawptr)
+		space := size + a - 1 + size_of(rawptr)
+
+		allocatedMem: rawptr
+
+		forceCopy := oldPtr != nil && alignment > align_of(rawptr)
+
+		if !forceCopy && oldPtr != nil {
+			originalOldPtr := ([^]rawptr)(oldPtr)[-1]
+			allocatedMem = HeapResize(originalOldPtr, oldSize, space, auto_cast a, fileCStr, line)
+		} else {
+			allocatedMem = G_GlobalState.memoryManager.Allocate(G_GlobalState.cached.heapAllocator, auto_cast space, auto_cast a, fileCStr, line)
+			if zeroMem {
+				MemClr(allocatedMem, auto_cast space)
+			}
+		}
+		alignedMem := rawptr(([^]u8)(allocatedMem)[size_of(rawptr):])
+
+		ptr := uintptr(alignedMem)
+		alignedPtr := (ptr - 1 + uintptr(a)) & ~(uintptr(a) - 1)
+		if allocatedMem == nil {
+			AlignedFree(oldPtr, fileCStr, line)
+			AlignedFree(allocatedMem, fileCStr, line)
+			return nil, .Out_Of_Memory
+		}
+
+		alignedMem = rawptr(alignedPtr)
+		([^]rawptr)(alignedMem)[-1] = allocatedMem
+
+		if forceCopy {
+			MemCopy(alignedMem, oldPtr, auto_cast (oldSize > size ? size : oldSize))
+			AlignedFree(oldPtr, fileCStr, line)
+		}
+
+		return ([^]byte)(alignedMem)[:(size > 0 ? size : 0)], nil
+	}
+
+	AlignedFree :: proc(p: rawptr, fileCStr: cstring, line: i32) {
+		if p != nil {
+			toFree := ([^]rawptr)(p)[-1]
+			G_GlobalState.memoryManager.Deallocate(G_GlobalState.cached.heapAllocator, toFree, fileCStr, line)
+		}
+	}
+
+	AlignedResize :: proc(p: rawptr, oldSize: int, newSize: int, newAlignment: int, zeroMem: bool, fileCStr: cstring, line: i32) -> (newMemory: []byte, err: runtime.Allocator_Error) {
+		if p == nil {
+			return AlignedAlloc(newSize, newAlignment, nil, oldSize, zeroMem, fileCStr, line)
+		}
+
+		newMemory = AlignedAlloc(newSize, newAlignment, p, oldSize, zeroMem, fileCStr, line) or_return
+
+		// NOTE: heap_resize does not zero the new memory, so we do it
+		if zeroMem && newSize > oldSize {
+			newRegion := raw_data(newMemory[oldSize:])
+
+			MemClr(newRegion, auto_cast (newSize - oldSize))
+		}
+		return
+	}
+
+	switch mode {
+	case .Alloc, .Alloc_Non_Zeroed:
+		return AlignedAlloc(size, alignment, nil, 0, mode == .Alloc, fileCStr, loc.line)
+
+	case .Free:
+		AlignedFree(oldMemory, fileCStr, loc.line)
+
+	case .Free_All:
+		return nil, .Mode_Not_Implemented
+
+	case .Resize, .Resize_Non_Zeroed:
+		return AlignedResize(oldMemory, oldSize, size, alignment, mode == .Resize, fileCStr, loc.line)
+
+	case .Query_Features:
+		set := (^runtime.Allocator_Mode_Set)(oldMemory)
+		if set != nil {
+			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Resize_Non_Zeroed, .Query_Features}
+		}
+		return nil, nil
+
+	case .Query_Info:
+		return nil, .Mode_Not_Implemented
+	}
+
+	return nil, nil
+}
+
+@(private = "file")
+OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, text: string, options: runtime.Logger_Options, loc := #caller_location) {
+	if context.logger.lowest_level > level {
+		return
+	}
+
+	lt: UnityLogType
+	switch level {
+	case .Error, .Fatal:
+		lt = .Error
+	case .Warning:
+		lt = .Warning
+	case .Debug, .Info:
+		lt = .Log
+	}
+
+	messageCStr := strings.clone_to_cstring(text, UNITY_DEFAULT_TEMP_ALLOCATOR, loc)
+	fileCStr := strings.clone_to_cstring(loc.file_path, UNITY_DEFAULT_TEMP_ALLOCATOR, loc)
+
+	G_GlobalState.logger.Log(lt, messageCStr, fileCStr, loc.line)
 }

@@ -50,12 +50,6 @@ namespace OdinInterop.Editor
                 }
             }
 
-            foreach (var (n, c) in InteropGeneratorInbuiltFiles.files)
-            {
-                var tgtFile = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, $"odntrop_{n}"));
-                File.WriteAllText(tgtFile, c);
-            }
-
             foreach (var t in TypeCache.GetTypesWithAttribute<GenerateOdinInteropAttribute>())
             {
                 // public static partial classes only
@@ -117,8 +111,14 @@ namespace OdinInterop.Editor
                     .AppendLine("#+vet !tabs !unused !style")
                     .AppendLine("package src")
                     .AppendLine()
-                    .AppendLine("@require import \"base:runtime\"")
-                    .AppendLine();
+                    .AppendLine("@require import \"base:runtime\"");
+
+                if (t == typeof(EngineBindings))
+                {
+                    s_StrBld.AppendLine("@require import \"core:strings\"");
+                }
+
+                s_StrBld.AppendLine();
 
                 foreach (var importedFn in importedFns)
                 {
