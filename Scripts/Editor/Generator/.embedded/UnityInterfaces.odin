@@ -16,8 +16,10 @@ IUnityInterface :: struct {}
 when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 	@(private = "file")
 	IUnityInterfaces :: struct {
-		GetInterface:      proc "std" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
-		RegisterInterface: proc "std" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterface:           proc "std" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		RegisterInterface:      proc "std" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterfaceSplit:      proc "std" (h: u64, l: u64) -> ^IUnityInterface,
+		RegisterInterfaceSplit: proc "std" (h: u64, l: u64, ptr: ^IUnityInterface),
 	}
 } else {
 	@(private = "file")
