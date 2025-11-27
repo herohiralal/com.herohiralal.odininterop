@@ -86,52 +86,15 @@ namespace OdinInterop
                 return Object.Instantiate(original, position, rotation);
         }
 
-        private static void* UnityOdnTropInternalMalloc(long size, int alignment, UnityAllocator allocator)
-        {
-            return UnsafeUtility.Malloc(size, alignment, allocator);
-        }
+        private static void MemCopy(void* destination, void* source, long size) => UnsafeUtility.MemCpy(destination, source, size);
 
-        private static void UnityOdnTropInternalFree(void* ptr, UnityAllocator allocator)
-        {
-            UnsafeUtility.Free(ptr, allocator);
-        }
+        private static void MemMove(void* destination, void* source, long size) => UnsafeUtility.MemMove(destination, source, size);
 
-        private static void UnityOdnTropInternalMemCopy(void* destination, void* source, long size)
-        {
-            UnsafeUtility.MemCpy(destination, source, size);
-        }
+        private static void MemSet(void* destination, byte value, long size) => UnsafeUtility.MemSet(destination, value, size);
 
-        private static void UnityOdnTropInternalMemMove(void* destination, void* source, long size)
-        {
-            UnsafeUtility.MemMove(destination, source, size);
-        }
+        private static void MemClr(void* destination, long size) => UnsafeUtility.MemClear(destination, size);
 
-        private static void UnityOdnTropInternalMemSet(void* destination, byte value, long size)
-        {
-            UnsafeUtility.MemSet(destination, value, size);
-        }
-
-        private static void UnityOdnTropInternalMemClear(void* destination, long size)
-        {
-            UnsafeUtility.MemClear(destination, size);
-        }
-
-        private static void UnityOdnTropInternalLog(
-            LogType logTy,
-            String8 msg,
-            String8 procedure,
-            String8 file,
-            int line, int column
-        )
-        {
-            Debug.LogFormat(logTy, LogOption.NoStacktrace, null,
-                "{0} (in function {1} at {2}:{3}:{4})",
-                msg.ToString(),
-                procedure.ToString(),
-                file.ToString(),
-                line, column
-            );
-        }
+        private static void* MemTmp(long size, int alignment) => UnsafeUtility.Malloc(size, alignment, UnityAllocator.Temp);
 
         private static void UnityOdnTropInternalPanic(String8 prefix, String8 message, String8 procedure, String8 file, int line, int column)
         {
@@ -147,10 +110,7 @@ namespace OdinInterop
             Utils.ForceCrash(ForcedCrashCategory.FatalError);
         }
 
-        private static void UnityOdnTropInternalRandomInitState(int seed)
-        {
-            Random.InitState(seed);
-        }
+        private static void UnityOdnTropInternalRandomInitState(int seed) => Random.InitState(seed);
 
         private static void UnityOdnTropInternalRandomGetState(out int a, out int b, out int c, out int d)
         {
@@ -192,10 +152,7 @@ namespace OdinInterop
             Random.state = s;
         }
 
-        private static int UnityOdnTropInternalRandomGetNextInt()
-        {
-            return Random.Range(int.MinValue, int.MaxValue);
-        }
+        private static int UnityOdnTropInternalRandomGetNextInt() => Random.Range(int.MinValue, int.MaxValue);
 
         public static partial String8 UnityOdnTropInternalAllocateString8(int length);
         public static partial String16 UnityOdnTropInternalAllocateString16(int length);

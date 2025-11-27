@@ -115,7 +115,7 @@ namespace OdinInterop.Editor
 
                 if (t == typeof(EngineBindings))
                 {
-                    s_StrBld.AppendLine("@require import \"core:strings\"");
+                    // in case need to add any special imports
                 }
 
                 s_StrBld.AppendLine();
@@ -296,10 +296,27 @@ namespace OdinInterop.Editor
                             .AppendIndent()
                             .AppendLine("G_OdnTrop_Internal_Ctx = context")
                             .AppendIndent()
-                            .AppendLine("defer G_OdnTrop_Internal_Ctx = odntrop_internal_tempCtx")
+                            .AppendLine("defer G_OdnTrop_Internal_Ctx = odntrop_internal_tempCtx");
+
+                        if (exportedFn.ReturnType != typeof(void))
+                        {
+                            s_StrBld
+                                .AppendIndent()
+                                .Append("odntrop_internal_RetValXXX: ")
+                                .AppendOdnTypeName(exportedFn.ReturnType, false)
+                                .AppendLine();
+                        }
+
+                        s_StrBld
                             .AppendIndent()
-                            .Append(exportedFn.ReturnType == typeof(void) ? "" : "return ")
-                            .Append($"odntrop_dydel_{tyName}_{exportedFn.Name}(");
+                            .AppendLine($"if odntrop_dydel_{tyName}_{exportedFn.Name} != nil {{");
+
+                        s_StrBldIndent++;
+
+                        s_StrBld.AppendIndent();
+                        if (exportedFn.ReturnType != typeof(void))
+                            s_StrBld.Append("odntrop_internal_RetValXXX = ");
+                        s_StrBld.Append($"odntrop_dydel_{tyName}_{exportedFn.Name}(");
 
                         for (int i = 0; i < parms.Length; i++)
                         {
@@ -309,6 +326,17 @@ namespace OdinInterop.Editor
                         }
 
                         s_StrBld.AppendLine(")");
+                        s_StrBldIndent--;
+                        s_StrBld
+                            .AppendIndent()
+                            .AppendLine("}");
+
+                        if (exportedFn.ReturnType != typeof(void))
+                        {
+                            s_StrBld
+                                .AppendIndent()
+                                .AppendLine("return odntrop_internal_RetValXXX");
+                        }
 
                         s_StrBldIndent--;
                         s_StrBld.AppendIndent().AppendLine("}").AppendLine();

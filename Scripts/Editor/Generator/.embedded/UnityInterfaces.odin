@@ -1,7 +1,6 @@
 package src
 
 import "base:runtime"
-import "core:strings"
 
 // IUnityInterface.h ================================================================================
 
@@ -383,8 +382,52 @@ UnityOdnTropInternalShutdownCachedState :: proc "contextless" () {
 }
 
 UNITY_MAIN_ALLOCATOR: runtime.Allocator : {procedure = OdnTrop_Internal_DefaultHeapAllocatorFunc, data = nil}
-
+UNITY_MAIN_TEMP_ALLOCATOR: runtime.Allocator : {procedure = OdnTrop_Internal_DefaultTempAllocatorFunc, data = nil}
 UNITY_MAIN_LOGGER: runtime.Logger : {procedure = OdnTrop_Internal_MainLogFunc, lowest_level = .Info, options = {.Date, .Short_File_Path, .Level, .Date, .Time, .Procedure}, data = nil}
+
+@(private = "file")
+OdndTrop_Internal_CloneToCStringUsingTempAlloc :: proc(s: string) -> cstring {
+	data := cast([^]u8)MemTmp(i64(len(s)) + 1, align_of(u8))
+	if data == nil {return "__STR_ALLOC_FAILURE__"}
+
+	MemCopy(data, raw_data(s), i64(len(s)))
+	data[len(s)] = 0
+	return cast(cstring)(data)
+}
+
+@(private = "file")
+OdnTrop_Internal_DefaultTempAllocatorFunc :: proc(allocatorData: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, oldMemory: rawptr, oldSize: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+	switch mode {
+	case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+		mem := MemTmp(auto_cast size, auto_cast alignment) // allocate
+		if mem == nil {return nil, .Out_Of_Memory} 	// return on fail
+		if mode == .Resize || mode == .Alloc {MemClr(mem, auto_cast size)} 	// zero if asked
+		if (mode == .Resize || mode == .Resize_Non_Zeroed) && oldMemory != nil {MemCopy(mem, oldMemory, auto_cast (oldSize > size ? size : oldSize))} 	// copy if asked
+		slice := runtime.Raw_Slice {
+			data = mem,
+			len  = auto_cast size,
+		}
+		return transmute([]byte)(slice), nil
+
+	case .Free:
+		return nil, nil // no freeing
+
+	case .Free_All:
+		return nil, nil // unity handles this
+
+	case .Query_Features:
+		set := (^runtime.Allocator_Mode_Set)(oldMemory)
+		if set != nil {
+			set^ = {.Alloc, .Resize, .Query_Features, .Alloc_Non_Zeroed, .Resize_Non_Zeroed}
+		}
+		return nil, nil
+
+	case .Query_Info:
+		return nil, .Mode_Not_Implemented
+	}
+
+	return nil, nil
+}
 
 @(private = "file")
 OdnTrop_Internal_DefaultHeapAllocatorFunc :: proc(allocatorData: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, oldMemory: rawptr, oldSize: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
@@ -394,7 +437,7 @@ OdnTrop_Internal_DefaultHeapAllocatorFunc :: proc(allocatorData: rawptr, mode: r
 	// padding. We also store the original pointer returned by heap_alloc right before
 	// the pointer we return to the user.
 
-	fileCStr := strings.clone_to_cstring(loc.file_path, UNITY_DEFAULT_TEMP_ALLOCATOR)
+	fileCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(loc.file_path)
 
 	HeapResize :: proc(ptr: rawptr, oldSize: int, newSize: int, alignment: u32, fileCStr: cstring, line: i32) -> rawptr {
 		if newSize == 0 {
@@ -513,8 +556,8 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 		lt = .Log
 	}
 
-	messageCStr := strings.clone_to_cstring(text, UNITY_DEFAULT_TEMP_ALLOCATOR, loc)
-	fileCStr := strings.clone_to_cstring(loc.file_path, UNITY_DEFAULT_TEMP_ALLOCATOR, loc)
+	messageCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(text)
+	fileCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(loc.file_path)
 
 	G_GlobalState.logger.Log(lt, messageCStr, fileCStr, loc.line)
 }
