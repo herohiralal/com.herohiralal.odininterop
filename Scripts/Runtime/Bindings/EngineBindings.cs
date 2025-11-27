@@ -164,7 +164,6 @@ namespace OdinInterop
         }
 
         // scene manager api
-        // TODO: add async scene loading/unloading support
 
         private static int GetLoadedScenesCount() => SceneManager.loadedSceneCount;
         private static int GetScenesCount() => SceneManager.sceneCount;
@@ -182,6 +181,22 @@ namespace OdinInterop
             SceneManager.MoveGameObjectsToScene(NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<int>(gameObjects.ptr, gameObjects.len.ToInt32(), UnityAllocator.None), *(Scene*)&sceneHandle);
         private static void MoveGameObjectToScene(ObjectHandle<GameObject> gameObject, int sceneHandle) => SceneManager.MoveGameObjectToScene(gameObject.value, *(Scene*)&sceneHandle);
         private static bool SetActiveScene(int sceneHandle) => SceneManager.SetActiveScene(*(Scene*)&sceneHandle);
+        private static uint LoadSceneAsyncByBuildIndex(int buildIndex, LoadSceneMode lsMode = default, LocalPhysicsMode phMode = default) =>
+            BindingsHelper.RegisterAsyncOperation(SceneManager.LoadSceneAsync(buildIndex, new LoadSceneParameters(lsMode, phMode)));
+        private static uint LoadSceneAsyncByName(String8 name, LoadSceneMode lsMode = default, LocalPhysicsMode phMode = default) =>
+            BindingsHelper.RegisterAsyncOperation(SceneManager.LoadSceneAsync(name.ToString(), new LoadSceneParameters(lsMode, phMode)));
+        private static uint UnloadSceneAsyncByHandle(int sceneHandle, bool unloadEmbedded) =>
+            BindingsHelper.RegisterAsyncOperation(SceneManager.UnloadSceneAsync(*(Scene*)&sceneHandle, unloadEmbedded ? UnloadSceneOptions.UnloadAllEmbeddedSceneObjects : UnloadSceneOptions.None));
+        private static uint UnloadSceneAsyncByBuildIndex(int buildIndex, bool unloadEmbedded) =>
+            BindingsHelper.RegisterAsyncOperation(SceneManager.UnloadSceneAsync(buildIndex, unloadEmbedded ? UnloadSceneOptions.UnloadAllEmbeddedSceneObjects : UnloadSceneOptions.None));
+        private static uint UnloadSceneAsyncByName(String8 name, bool unloadEmbedded) =>
+            BindingsHelper.RegisterAsyncOperation(SceneManager.UnloadSceneAsync(name.ToString(), unloadEmbedded ? UnloadSceneOptions.UnloadAllEmbeddedSceneObjects : UnloadSceneOptions.None));
+        private static float GetAsyncOperationProgress(uint asyncOpId) => BindingsHelper.GetAsyncOperationProgress(asyncOpId);
+        private static bool IsAsyncOperationDone(uint asyncOpId) => BindingsHelper.IsAsyncOperationDone(asyncOpId);
+        private static int GetAsyncOperationPriority(uint asyncOpId) => BindingsHelper.GetAsyncOperationPriority(asyncOpId);
+        private static void SetAsyncOperationPriority(uint asyncOpId, int priority) => BindingsHelper.SetAsyncOperationPriority(asyncOpId, priority);
+        private static bool DoesAsyncSceneOperationAllowActivation(uint asyncOpId) => BindingsHelper.DoesAsyncSceneOperationAllowActivation(asyncOpId);
+        private static void SetAsyncSceneOperationAllowActivation(uint asyncOpId, bool allow) => BindingsHelper.SetAsyncSceneOperationAllowActivation(asyncOpId, allow);
 
         // gameobject api
 
