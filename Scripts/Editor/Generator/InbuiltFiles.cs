@@ -121,6 +121,11 @@ InstantiateObject :: proc {
 	InstantiateObjectWithTransform,
 }
 
+GetTransform :: proc {
+	GetTransformFromGameObject,
+	GetTransformFromComponent,
+}
+
 GetGameObjectLayer :: proc(go: GameObject) -> GameObjectLayer {
 	return GameObjectLayer(u8(UnityOdnTropInternalGetGameObjectLayer(go)))
 }

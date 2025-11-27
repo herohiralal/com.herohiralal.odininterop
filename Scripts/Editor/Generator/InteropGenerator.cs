@@ -451,7 +451,12 @@ namespace OdinInterop.Editor
                 }
 
                 var baseTypeResolvedName = t.BaseType.GetResolvedOdnTypeName();
-                return sb.AppendIndent().Append($"{resolvedName} :: struct {{ #subtype parent: {baseTypeResolvedName} }}").AppendLine();
+                return sb
+                    .AppendIndent()
+                    .AppendLine($"{resolvedName} :: struct {{ #subtype parent: {baseTypeResolvedName} }}")
+                    .AppendIndent()
+                    .AppendLine($"OBJECT_TYPE_{resolvedName} :: `{t.AssemblyQualifiedName}`")
+                    .AppendLine();
             }
 
             if (t.IsEnum)
