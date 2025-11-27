@@ -22,8 +22,10 @@ when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 } else {
 	@(private = "file")
 	IUnityInterfaces :: struct {
-		GetInterface:      proc "c" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
-		RegisterInterface: proc "c" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterface:           proc "c" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		RegisterInterface:      proc "c" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterfaceSplit:      proc "c" (h: u64, l: u64) -> ^IUnityInterface,
+		RegisterInterfaceSplit: proc "c" (h: u64, l: u64, ptr: ^IUnityInterface),
 	}
 }
 
@@ -356,9 +358,9 @@ when UNITY_EDITOR {
 UnityOdnTropInternalStaticInitialise :: proc "contextless" () {
 	// only do here things that are safe and don't require any caching
 
-	G_GlobalState.logger = cast(^IUnityLog)(G_GlobalState.interfaces.GetInterface(IUnityLogGUID))
-	G_GlobalState.profiler = cast(^IUnityProfilerV2)(G_GlobalState.interfaces.GetInterface(IUnityProfilerV2GUID))
-	G_GlobalState.memoryManager = cast(^IUnityMemoryManager)(G_GlobalState.interfaces.GetInterface(IUnityMemoryManagerGUID))
+	G_GlobalState.logger = cast(^IUnityLog)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityLogGUID.high, IUnityLogGUID.low))
+	G_GlobalState.profiler = cast(^IUnityProfilerV2)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityProfilerV2GUID.high, IUnityProfilerV2GUID.low))
+	G_GlobalState.memoryManager = cast(^IUnityMemoryManager)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityMemoryManagerGUID.high, IUnityMemoryManagerGUID.low))
 }
 
 UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
