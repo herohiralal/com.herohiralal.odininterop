@@ -346,8 +346,8 @@ when UNITY_EDITOR {
 		@(private = "file")
 		UnityPluginLoad :: proc "c" (ptr: ^IUnityInterfaces) {
 			G_GlobalState.interfaces = ptr
-			UnityOdnTropInternalInitialiseCachedState()
 			UnityOdnTropInternalStaticInitialise()
+			UnityOdnTropInternalInitialiseCachedState()
 		}
 
 		@(export)
