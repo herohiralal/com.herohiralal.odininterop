@@ -542,15 +542,45 @@ namespace OdinInterop.SourceGenerator
                 }
                 else if (odStr == "OdinInterop.DynamicArray<T>")
                 {
-                    return sb.Append("RawDynamicArray");
+                    if (useInteroperableVersion)
+                    {
+                        return sb.Append("RawDynamicArray");
+                    }
+                    else
+                    {
+                        sb.Append("DynamicArray<");
+                        sb.AppendTypeName(nt.TypeArguments[0], false);
+                        sb.Append(">");
+                        return sb;
+                    }
                 }
                 else if (odStr == "OdinInterop.Slice<T>")
                 {
-                    return sb.Append("RawSlice");
+                    if (useInteroperableVersion)
+                    {
+                        return sb.Append("RawSlice");
+                    }
+                    else
+                    {
+                        sb.Append("Slice<");
+                        sb.AppendTypeName(nt.TypeArguments[0], false);
+                        sb.Append(">");
+                        return sb;
+                    }
                 }
                 else if (odStr == "OdinInterop.ObjectHandle<T>")
                 {
-                    return sb.Append("RawObjectHandle");
+                    if (useInteroperableVersion)
+                    {
+                        return sb.Append("RawObjectHandle");
+                    }
+                    else
+                    {
+                        sb.Append("ObjectHandle<");
+                        sb.AppendTypeName(nt.TypeArguments[0], false);
+                        sb.Append(">");
+                        return sb;
+                    }
                 }
             }
 
@@ -584,6 +614,7 @@ namespace OdinInterop.SourceGenerator
                     else if (fullName.StartsWith("OdinInterop.DynamicArray")) s = fullName;
                     else if (fullName == "OdinInterop.String8") s = "OdinInterop.String8";
                     else if (fullName == "OdinInterop.String16") s = "OdinInterop.String16";
+                    else if (fullName == "OdinInterop.Allocator") s = "OdinInterop.Allocator";
                     else if (type.TypeKind == TypeKind.Enum) // enum
                     {
                         s = fullName;

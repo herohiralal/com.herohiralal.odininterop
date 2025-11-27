@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Reflection;
 using System.Linq;
+using UnityEditorInternal;
 
 namespace OdinInterop.Editor
 {
@@ -50,6 +51,79 @@ namespace OdinInterop.Editor
                 }
             }
 
+            // export the layers and tags
+            {
+                var p = Path.GetFullPath(Path.Combine(ODIN_INTEROP_OUT_DIR, "odntrop_internal_unity_layersandtags.odin"));
+                s_StrBld.Clear();
+
+                s_StrBld
+                    .AppendLine("// THIS IS A GENERATED FILE - DO NOT MODIFY OR YOUR CHANGES WILL BE LOST!")
+                    .AppendLine("#+vet !tabs !unused !style")
+                    .AppendLine("package src")
+                    .AppendLine();
+
+                s_StrBld
+                    .AppendIndent()
+                    .AppendLine("GameObjectLayer :: enum u8 {");
+
+                s_StrBldIndent++;
+                for (var i = 0; i < 32; i++)
+                {
+                    var layerName = LayerMask.LayerToName(i);
+                    if (string.IsNullOrWhiteSpace(layerName))
+                        layerName = $"Layer_{i}";
+
+                    // sanitize layer name
+                    for (int c = 0; c < layerName.Length; c++)
+                    {
+                        var ch = layerName[c];
+                        if (!char.IsLetterOrDigit(ch) && ch != '_')
+                        {
+                            layerName = layerName.Replace(ch, '_');
+                        }
+                    }
+
+                    s_StrBld
+                        .AppendIndent()
+                        .Append(layerName)
+                        .Append(" = ")
+                        .Append(i)
+                        .AppendLine(",");
+                }
+                s_StrBldIndent--;
+                s_StrBld
+                    .AppendIndent()
+                    .AppendLine("}")
+                    .AppendLine();
+
+                s_StrBld
+                    .AppendIndent()
+                    .AppendLine("GameObjectLayerMask :: distinct bit_set[GameObjectLayer;i32]")
+                    .AppendLine();
+
+                var tags = InternalEditorUtility.tags;
+                foreach (var tag in tags)
+                {
+                    var t = tag;
+                    // sanitize tag name
+                    for (int c = 0; c < t.Length; c++)
+                    {
+                        var ch = t[c];
+                        if (!char.IsLetterOrDigit(ch) && ch != '_')
+                        {
+                            t = t.Replace(ch, '_');
+                        }
+                    }
+
+                    s_StrBld
+                        .AppendIndent()
+                        .AppendLine($"GAME_OBJECT_TAG_{t} :: \"{tag}\"");
+                }
+
+                File.WriteAllText(p, s_StrBld.ToString());
+            }
+
+            // actual bindings generation
             foreach (var t in TypeCache.GetTypesWithAttribute<GenerateOdinInteropAttribute>())
             {
                 // public static partial classes only
@@ -277,7 +351,14 @@ namespace OdinInterop.Editor
                             s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
                             if (p.HasDefaultValue)
                             {
-                                s_StrBld.Append(" = {}");
+                                if (p.ParameterType == typeof(Allocator))
+                                {
+                                    s_StrBld.Append(" = context.allocator");
+                                }
+                                else
+                                {
+                                    s_StrBld.Append(" = {}");
+                                }
                             }
                             s_StrBld.Append(", ");
                         }
@@ -560,6 +641,10 @@ namespace OdinInterop.Editor
             else if (t == typeof(String16))
             {
                 sb.Append("string16");
+            }
+            else if (t == typeof(Allocator))
+            {
+                sb.Append("runtime.Allocator");
             }
             else
             {

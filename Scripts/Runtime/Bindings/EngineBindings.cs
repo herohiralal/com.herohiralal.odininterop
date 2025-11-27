@@ -3,6 +3,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Diagnostics;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
 using UnityAllocator = Unity.Collections.Allocator;
@@ -12,6 +13,29 @@ namespace OdinInterop
     [GenerateOdinInterop]
     internal static unsafe partial class EngineBindings
     {
+        static EngineBindings()
+        {
+#if UNINTY_EDITOR || DEVELOPMENT_BUILD
+            var sb = new System.Text.StringBuilder();
+            if (sizeof(UnityEngine.SceneManagement.Scene) != sizeof(int))
+                sb.AppendLine("EngineBindings: Scene struct size mismatch!");
+
+            if (UnsafeUtility.AlignOf<UnityEngine.SceneManagement.Scene>() != UnsafeUtility.AlignOf<int>())
+                sb.AppendLine("EngineBindings: Scene struct alignment mismatch!");
+
+            if (sizeof(Random.State) != (4 * sizeof(int)))
+                sb.AppendLine("EngineBindings: Random.State size mismatch!");
+
+            if (UnsafeUtility.AlignOf<Random.State>() != UnsafeUtility.AlignOf<int>())
+                sb.AppendLine("EngineBindings: Random.State alignment mismatch!");
+
+            if (sb.Length > 0)
+            {
+                throw new Exception(sb.ToString());
+            }
+#endif
+        }
+
         private static HideFlags GetObjectHideFlags(ObjectHandle<Object> obj)
         {
             return obj ? obj.value.hideFlags : HideFlags.None;
@@ -23,12 +47,11 @@ namespace OdinInterop
                 obj.value.hideFlags = flags;
         }
 
-        private static String8 GetObjectName(ObjectHandle<Object> obj)
+        private static String8 GetObjectName(ObjectHandle<Object> obj, Allocator allocator)
         {
-            if (obj)
-                return obj.value.name;
-            else
-                return "";
+            if (!obj) return default;
+
+            return new String8(obj.value.name, allocator);
         }
 
         private static void SetObjectName(ObjectHandle<Object> obj, String8 name)
@@ -86,6 +109,168 @@ namespace OdinInterop
                 return Object.Instantiate(original, position, rotation);
         }
 
+        // scenes api
+
+        private static int GetSceneBuildIndex(int sceneHandle)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return scene.buildIndex;
+        }
+
+        private static bool IsSceneDirty(int sceneHandle)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return scene.isDirty;
+        }
+
+        private static bool IsSceneLoaded(int sceneHandle)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return scene.isLoaded;
+        }
+
+        private static bool IsSceneValid(int sceneHandle)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return scene.IsValid();
+        }
+
+        private static String8 GetSceneName(int sceneHandle, Allocator allocator)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return new String8(scene.name, allocator);
+        }
+
+        private static String8 GetScenePath(int sceneHandle, Allocator allocator)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return new String8(scene.path, allocator);
+        }
+
+        private static int GetRootGameObjectsCount(int sceneHandle)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            return scene.rootCount;
+        }
+
+        private static Slice<ObjectHandle<GameObject>> GetRootGameObjects(int sceneHandle, Allocator allocator)
+        {
+            var scene = *(Scene*)&sceneHandle;
+            var roots = scene.GetRootGameObjects();
+            var slice = new Slice<ObjectHandle<GameObject>>(roots.Length, allocator);
+            for (var i = 0; i < roots.Length; i++)
+                slice.ptr[i] = roots[i];
+            return slice;
+        }
+
+        // scene manager api
+        // TODO: add async scene loading/unloading support
+
+        private static int GetLoadedScenesCount() => SceneManager.loadedSceneCount;
+        private static int GetScenesCount() => SceneManager.sceneCount;
+        private static int GetScenesCountInBuildSettings() => SceneManager.sceneCountInBuildSettings;
+        private static int CreateScene(String8 name, LocalPhysicsMode physicsMode = default) => SceneManager.CreateScene(name.ToString(), new CreateSceneParameters(physicsMode)).handle;
+        private static int GetActiveScene() => SceneManager.GetActiveScene().handle;
+        private static int GetSceneAtIndex(int index) => SceneManager.GetSceneAt(index).handle;
+        private static int GetSceneByBuildIndex(int buildIndex) => SceneManager.GetSceneByBuildIndex(buildIndex).handle;
+        private static int GetSceneByName(String8 name) => SceneManager.GetSceneByName(name.ToString()).handle;
+        private static int GetSceneByPath(String8 path) => SceneManager.GetSceneByPath(path.ToString()).handle;
+        private static void LoadSceneByBuildIndex(int buildIndex, LoadSceneMode mode = default) => SceneManager.LoadScene(buildIndex, mode);
+        private static void LoadSceneByName(String8 name, LoadSceneMode mode = default) => SceneManager.LoadScene(name.ToString(), mode);
+        private static void MergeScenes(int src, int dst) => SceneManager.MergeScenes(*(Scene*)&src, *(Scene*)&dst);
+        private static void MoveGameObjectsToScene(Slice<ObjectHandle<GameObject>> gameObjects, int sceneHandle) =>
+            SceneManager.MoveGameObjectsToScene(NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<int>(gameObjects.ptr, gameObjects.len.ToInt32(), UnityAllocator.None), *(Scene*)&sceneHandle);
+        private static void MoveGameObjectToScene(ObjectHandle<GameObject> gameObject, int sceneHandle) => SceneManager.MoveGameObjectToScene(gameObject.value, *(Scene*)&sceneHandle);
+        private static bool SetActiveScene(int sceneHandle) => SceneManager.SetActiveScene(*(Scene*)&sceneHandle);
+
+        // gameobject api
+
+        private static bool IsGameObjectActiveInHierarchy(ObjectHandle<GameObject> gameObject)
+        {
+            if (gameObject)
+                return gameObject.value.activeInHierarchy;
+            else
+                return false;
+        }
+
+        private static bool IsGameObjectActive(ObjectHandle<GameObject> gameObject)
+        {
+            if (gameObject)
+                return gameObject.value.activeSelf;
+            else
+                return false;
+        }
+
+        private static void SetGameObjectActive(ObjectHandle<GameObject> gameObject, bool active)
+        {
+            if (gameObject)
+                gameObject.value.SetActive(active);
+        }
+
+        private static int UnityOdnTropInternalGetGameObjectLayer(ObjectHandle<GameObject> gameObject)
+        {
+            if (gameObject)
+                return gameObject.value.layer;
+            else
+                return 0;
+        }
+
+        private static void UnityOdnTropInternalSetGameObjectLayer(ObjectHandle<GameObject> gameObject, int layer)
+        {
+            if (gameObject)
+                gameObject.value.layer = layer;
+        }
+
+        private static int GetScene(ObjectHandle<GameObject> gameObject)
+        {
+            if (!gameObject) return default;
+
+            var sc = gameObject.value.scene;
+            return sc.handle;
+        }
+
+        // component api
+
+        private static ObjectHandle<GameObject> GetGameObject(ObjectHandle<Component> component)
+        {
+            if (component)
+                return component.value.gameObject;
+            else
+                return default;
+        }
+
+        private static ObjectHandle<Transform> GetTransform(ObjectHandle<Component> component)
+        {
+            if (component)
+                return component.value.transform;
+            else
+                return default;
+        }
+
+        // behaviour api
+
+        private static bool IsBehaviourEnabled(ObjectHandle<Behaviour> behaviour)
+        {
+            if (behaviour)
+                return behaviour.value.enabled;
+            else
+                return false;
+        }
+
+        private static void SetBehaviourEnabled(ObjectHandle<Behaviour> behaviour, bool enabled)
+        {
+            if (behaviour)
+                behaviour.value.enabled = enabled;
+        }
+
+        private static bool IsBehaviourActiveAndEnabled(ObjectHandle<Behaviour> behaviour)
+        {
+            if (behaviour)
+                return behaviour.value.isActiveAndEnabled;
+            else
+                return false;
+        }
+
         private static void MemCopy(void* destination, void* source, long size) => UnsafeUtility.MemCpy(destination, source, size);
 
         private static void MemMove(void* destination, void* source, long size) => UnsafeUtility.MemMove(destination, source, size);
@@ -114,15 +299,6 @@ namespace OdinInterop
 
         private static void UnityOdnTropInternalRandomGetState(out int a, out int b, out int c, out int d)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (sizeof(Random.State) != (4 * sizeof(int)) || UnsafeUtility.AlignOf<Random.State>() != UnsafeUtility.AlignOf<int>())
-            {
-                Debug.LogError("UnityRandomGetState: Random.State layout mismatch!");
-                a = b = c = d = 0;
-                return;
-            }
-#endif
-
             var s = Random.state;
             int* statePtr = (int*)&s;
             a = statePtr[0];
@@ -133,16 +309,7 @@ namespace OdinInterop
 
         private static void UnityOdnTropInternalRandomSetState(int a, int b, int c, int d)
         {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (sizeof(Random.State) != (4 * sizeof(int)) || UnsafeUtility.AlignOf<Random.State>() != UnsafeUtility.AlignOf<int>())
-            {
-                Debug.LogError("UnityRandomGetState: Random.State layout mismatch!");
-                a = b = c = d = 0;
-                return;
-            }
-#endif
-
-            Random.State s = new Random.State();
+            var s = new Random.State();
             int* statePtr = (int*)&s;
             statePtr[0] = a;
             statePtr[1] = b;
@@ -154,7 +321,9 @@ namespace OdinInterop
 
         private static int UnityOdnTropInternalRandomGetNextInt() => Random.Range(int.MinValue, int.MaxValue);
 
-        public static partial String8 UnityOdnTropInternalAllocateString8(int length);
-        public static partial String16 UnityOdnTropInternalAllocateString16(int length);
+        public static partial Allocator UnityOdnTropInternalGetMainOdnAllocator();
+        public static partial Allocator UnityOdnTropInternalGetTempOdnAllocator();
+        public static partial Slice<byte> UnityOdnTropInternalAllocateUsingOdnAllocator(int tySize, int tyAlignment, int tyCount, Allocator allocator);
+        public static partial void UnityOdnTropInternalFreeUsingOdnAllocator(Slice<byte> ptr, Allocator allocator);
     }
 }

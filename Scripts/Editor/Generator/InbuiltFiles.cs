@@ -96,20 +96,37 @@ OdnTrop_Internal_GenerateRandomNumber :: proc(data: rawptr, mode: runtime.Random
 }
 
 @(private = ""file"")
-UnityOdnTropInternalAllocateString8: UnityOdnTropInternalAllocateString8Delegate : proc(length: i32) -> string {
-	x := make([]u8, auto_cast length)
-	return transmute(string)x
+UnityOdnTropInternalGetMainOdnAllocator: UnityOdnTropInternalGetMainOdnAllocatorDelegate : proc() -> runtime.Allocator {
+	return UNITY_MAIN_ALLOCATOR
 }
 
 @(private = ""file"")
-UnityOdnTropInternalAllocateString16: UnityOdnTropInternalAllocateString16Delegate : proc(length: i32) -> string16 {
-	x := make([]u16, auto_cast length)
-	return transmute(string16)x
+UnityOdnTropInternalGetTempOdnAllocator: UnityOdnTropInternalGetTempOdnAllocatorDelegate : proc() -> runtime.Allocator {
+	return UNITY_MAIN_TEMP_ALLOCATOR
+}
+
+@(private = ""file"")
+UnityOdnTropInternalAllocateUsingOdnAllocator: UnityOdnTropInternalAllocateUsingOdnAllocatorDelegate : proc(size: i32, alignment: i32, count: i32, allocator: runtime.Allocator) -> []u8 {
+	x, _ := runtime.mem_alloc_bytes(size = int(size * count), alignment = int(alignment), allocator = allocator)
+	return x
+}
+
+@(private = ""file"")
+UnityOdnTropInternalFreeUsingOdnAllocator: UnityOdnTropInternalFreeUsingOdnAllocatorDelegate : proc(ptr: []u8, allocator: runtime.Allocator) {
+	runtime.mem_free_bytes(bytes = ptr, allocator = allocator)
 }
 
 InstantiateObject :: proc {
 	InstantiateObjectWithoutTransform,
 	InstantiateObjectWithTransform,
+}
+
+GetGameObjectLayer :: proc(go: GameObject) -> GameObjectLayer {
+	return GameObjectLayer(u8(UnityOdnTropInternalGetGameObjectLayer(go)))
+}
+
+SetGameObjectLayer :: proc(go: GameObject, layer: GameObjectLayer) {
+	UnityOdnTropInternalSetGameObjectLayer(go, i32(u8(layer)))
 }
 ";
 	}

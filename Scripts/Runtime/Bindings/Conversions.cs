@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Collections.LowLevel.Unsafe;
 using Object = UnityEngine.Object;
 
 namespace OdinInterop
@@ -11,7 +12,7 @@ namespace OdinInterop
         public void* data;
     }
 
-    public unsafe struct Slice<T> where T : unmanaged
+    public unsafe struct Slice<T> : IDisposable where T : unmanaged
     {
         public T* ptr;
         public IntPtr len;
@@ -19,17 +20,32 @@ namespace OdinInterop
         public static implicit operator T[](Slice<T> slice)
         {
             var arr = new T[(int)slice.len];
-            for (int i = 0; i < (int)slice.len; i++)
-            {
+            for (var i = 0; i < (int)slice.len; i++)
                 arr[i] = slice.ptr[i];
-            }
             return arr;
         }
 
-        public static implicit operator Slice<T>(T[] arr)
+        public Slice(int length, Allocator allocator)
         {
-            // TODO
-            return default;
+            var s = EngineBindings.UnityOdnTropInternalAllocateUsingOdnAllocator(sizeof(T), UnsafeUtility.AlignOf<T>(), length, allocator);
+            this = s.Reinterpret<T>();
+        }
+
+        public Slice(T[] arr, Allocator allocator) : this(arr.Length, allocator)
+        {
+            if (ptr == null)
+                return;
+
+            for (var i = 0; i < arr.Length; i++)
+                ptr[i] = arr[i];
+        }
+
+        public Slice<U> Reinterpret<U>() where U : unmanaged
+        {
+            Slice<U> slice;
+            slice.ptr = (U*)ptr;
+            slice.len = (IntPtr)((len.ToInt64() * sizeof(T)) / sizeof(U));
+            return slice;
         }
 
         public static implicit operator RawSlice(Slice<T> slice)
@@ -47,6 +63,10 @@ namespace OdinInterop
             slice.len = rawSlice.len;
             return slice;
         }
+
+        public void Dispose() => Dispose(EngineBindings.UnityOdnTropInternalGetMainOdnAllocator());
+
+        public void Dispose(Allocator allocator) => EngineBindings.UnityOdnTropInternalFreeUsingOdnAllocator(Reinterpret<byte>(), allocator);
     }
 
     public unsafe struct RawSlice // type-unknown slice
@@ -55,7 +75,7 @@ namespace OdinInterop
         public IntPtr len;
     }
 
-    public unsafe struct String8 // reinterpretable as Slice<byte>
+    public unsafe struct String8 : IDisposable // reinterpretable as Slice<byte>
     {
         public byte* ptr; // utf-8
         public IntPtr len;
@@ -76,14 +96,32 @@ namespace OdinInterop
             return str;
         }
 
-        public static implicit operator String8(string str)
+        public String8(string str, Allocator allocator)
         {
+            if (string.IsNullOrEmpty(str))
+            {
+                this = default;
+                return;
+            }
+
             var b = System.Text.Encoding.UTF8.GetBytes(str);
-            var s = EngineBindings.UnityOdnTropInternalAllocateString8(b.Length);
-            for (int i = 0; i < b.Length; i++)
-                s.ptr[i] = b[i];
-            return s;
+            var s = EngineBindings.UnityOdnTropInternalAllocateUsingOdnAllocator(1, 1, b.Length, allocator);
+            if (s.ptr == null)
+            {
+                this = default;
+                return;
+            }
+
+            this = s;
+
+            for (var i = 0; i < b.Length; i++)
+                ptr[i] = b[i];
         }
+
+        public Slice<byte> AsSlice() => new Slice<byte>() { ptr = ptr, len = len };
+
+        public void Dispose() => AsSlice().Dispose();
+        public void Dispose(Allocator allocator) => AsSlice().Dispose(allocator);
 
         public override string ToString()
         {
@@ -91,7 +129,7 @@ namespace OdinInterop
         }
     }
 
-    public unsafe struct String16 // reinterpretable as Slice<char>
+    public unsafe struct String16 : IDisposable // reinterpretable as Slice<char>
     {
         public char* ptr; // utf-16
         public IntPtr len;
@@ -112,13 +150,30 @@ namespace OdinInterop
             return str;
         }
 
-        public static implicit operator String16(string str)
+        public String16(string str, Allocator allocator)
         {
-            var s = EngineBindings.UnityOdnTropInternalAllocateString16(str.Length);
-            for (int i = 0; i < str.Length; i++)
+            if (string.IsNullOrEmpty(str))
+            {
+                this = default;
+                return;
+            }
+
+            var s2 = EngineBindings.UnityOdnTropInternalAllocateUsingOdnAllocator(2, 2, str.Length, allocator);
+            if (s2.ptr == null)
+            {
+                this = default;
+                return;
+            }
+
+            var s = new String16() { ptr = (char*)s2.ptr, len = s2.len };
+            for (var i = 0; i < str.Length; i++)
                 s.ptr[i] = str[i];
-            return s;
+            this = s;
         }
+
+        public Slice<char> AsSlice() => new Slice<char>() { ptr = ptr, len = len };
+        public void Dispose() => AsSlice().Dispose();
+        public void Dispose(Allocator allocator) => AsSlice().Dispose(allocator);
 
         public override string ToString()
         {
@@ -126,7 +181,7 @@ namespace OdinInterop
         }
     }
 
-    public unsafe struct DynamicArray<T> where T : unmanaged // 'derived' from Slice<T>
+    public unsafe struct DynamicArray<T> : IDisposable where T : unmanaged // 'derived' from Slice<T>
     {
         public T* ptr;
         public IntPtr len;
@@ -136,18 +191,44 @@ namespace OdinInterop
         public static implicit operator List<T>(DynamicArray<T> arr)
         {
             var list = new List<T>((int)arr.len);
-            for (int i = 0; i < (int)arr.len; i++)
+            for (var i = 0; i < (int)arr.len; i++)
             {
                 list.Add(arr.ptr[i]);
             }
             return list;
         }
 
-        public static implicit operator DynamicArray<T>(List<T> list)
+        public DynamicArray(int capacity, Allocator allocator)
         {
-            // TODO: need to export allocator functions and all that
-            return default;
+            var s = EngineBindings.UnityOdnTropInternalAllocateUsingOdnAllocator(sizeof(T), UnsafeUtility.AlignOf<T>(), capacity, allocator);
+            var s2 = s.Reinterpret<T>();
+            ptr = s2.ptr;
+            len = IntPtr.Zero;
+            cap = s2.len;
+            this.allocator = allocator;
         }
+
+        public DynamicArray(List<T> list, Allocator allocator)
+        {
+            var s = EngineBindings.UnityOdnTropInternalAllocateUsingOdnAllocator(sizeof(T), UnsafeUtility.AlignOf<T>(), list.Capacity, allocator);
+            if (s.ptr == null)
+            {
+                this = default;
+                return;
+            }
+
+            var alt = s.Reinterpret<T>();
+            ptr = alt.ptr;
+            len = (IntPtr)list.Count;
+            cap = alt.len;
+            this.allocator = allocator;
+
+            for (var i = 0; i < list.Count; i++)
+                ptr[i] = list[i];
+        }
+
+        public void Dispose() => Dispose(allocator);
+        public void Dispose(Allocator allocator) => new Slice<T>() { ptr = ptr, len = cap }.Dispose(allocator);
 
         public static implicit operator RawDynamicArray(DynamicArray<T> arr)
         {

@@ -115,7 +115,6 @@ namespace OdinInterop.Editor
                 LibraryUtils.CloseLibrary(StoredState.value.libHandle);
             }
 
-            InteropGenerator.GenerateInteropCode();
             HotReload();
         }
 
@@ -128,6 +127,7 @@ namespace OdinInterop.Editor
                 OdinCompilerUtils.RaiseHotReloadEvt(IntPtr.Zero);
             }
 
+            InteropGenerator.GenerateInteropCode();
             if (!CompileOdinInteropLibraryForEditor(out var libPath))
             {
                 Debug.LogError("[OdinCompiler]: Failed to compile OdinInteropEditor library. No active library present.");
