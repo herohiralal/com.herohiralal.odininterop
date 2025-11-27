@@ -18,15 +18,6 @@ namespace OdinInterop.Editor
 
         // editor stuff
         private static readonly string ODIN_LIB_EDITOR_OUTPUT_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Editor");
-        private static readonly string ODIN_LIB_EDITOR_OUTPUT_PATH = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH,
-#if UNITY_EDITOR_WIN
-            "OdinInteropEditor.dll"
-#elif UNITY_EDITOR_OSX
-            "libOdinInteropEditor.dylib"
-#else
-            "libOdinInteropEditor.so"
-#endif
-        );
 
         // runtime stuff
         public static readonly string ODIN_PLUGIN_DIR_PATH = Path.GetFullPath(Path.Combine(Application.dataPath, "Plugins"));
@@ -137,13 +128,13 @@ namespace OdinInterop.Editor
                 OdinCompilerUtils.RaiseHotReloadEvt(IntPtr.Zero);
             }
 
-            if (!CompileOdinInteropLibraryForEditor())
+            if (!CompileOdinInteropLibraryForEditor(out var libPath))
             {
                 Debug.LogError("[OdinCompiler]: Failed to compile OdinInteropEditor library. No active library present.");
                 return;
             }
 
-            var libraryHandle = LibraryUtils.OpenLibrary(ODIN_LIB_EDITOR_OUTPUT_PATH);
+            var libraryHandle = LibraryUtils.OpenLibrary(libPath);
             StoredState.value.libHandle = libraryHandle;
             if (libraryHandle == IntPtr.Zero)
             {
@@ -158,15 +149,38 @@ namespace OdinInterop.Editor
         private unsafe delegate void SetUnityInterfacesPtrDelegate(RawStoredState* ptr);
 
 
-        internal static bool CompileOdinInteropLibraryForEditor()
+        internal static bool CompileOdinInteropLibraryForEditor(out string path)
         {
             if (!Directory.Exists(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH))
                 Directory.CreateDirectory(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH);
 
-            // TODO: rename pdb for windows
-            return RunOdinCompiler(new List<string>
+            const string FILE_PREFIX =
+#if UNITY_EDITOR_WIN
+                "OdinInteropEditor";
+#else
+                "libOdinInteropEditor";
+#endif
+
+            const string FILE_EXTENSION =
+#if UNITY_EDITOR_WIN
+                ".dll";
+#elif UNITY_EDITOR_OSX
+                ".dylib";
+#elif UNITY_EDITOR_LINUX
+                ".so";
+#endif
+
+            // delete all previous builds
+            // but not just limited to the target extension because windows also outputs .exp/.lib/.pdb files
+            foreach (var f in Directory.GetFiles(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH, $"{FILE_PREFIX}*"))
+                try { File.Delete(f); } catch { /* ignore */ }
+
+            // make a path with timestamp
+            path = Path.Combine(ODIN_LIB_EDITOR_OUTPUT_DIR_PATH, $"{FILE_PREFIX}_{DateTime.Now:yyyyMMddHHmmss}{FILE_EXTENSION}");
+
+            var compilerSuccess = RunOdinCompiler(new List<string>
             {
-                $"-out:{ODIN_LIB_EDITOR_OUTPUT_PATH}",
+                $"-out:{path}",
                 "-build-mode:dynamic",
 #if UNITY_EDITOR
                 "-define:UNITY_EDITOR=true",
@@ -200,6 +214,8 @@ namespace OdinInterop.Editor
 
 #endif
             });
+
+            return compilerSuccess;
         }
 
         // assumes windows host
