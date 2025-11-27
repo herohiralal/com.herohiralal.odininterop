@@ -13,21 +13,24 @@ UnityInterfaceGUID :: struct {
 @(private = "file")
 IUnityInterface :: struct {}
 
+// these interfaces have a couple empty fields because
+// the real functions there use a copy constructor for the GUIDs
+// which breaks the C ABI, so we instead use the other overloads
 when UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN {
 	@(private = "file")
 	IUnityInterfaces :: struct {
-		GetInterface:           proc "std" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
-		RegisterInterface:      proc "std" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
-		GetInterfaceSplit:      proc "std" (h: u64, l: u64) -> ^IUnityInterface,
-		RegisterInterfaceSplit: proc "std" (h: u64, l: u64, ptr: ^IUnityInterface),
+		_:                 proc "std" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		_:                 proc "std" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterface:      proc "std" (h: u64, l: u64) -> ^IUnityInterface,
+		RegisterInterface: proc "std" (h: u64, l: u64, ptr: ^IUnityInterface),
 	}
 } else {
 	@(private = "file")
 	IUnityInterfaces :: struct {
-		GetInterface:           proc "c" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
-		RegisterInterface:      proc "c" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
-		GetInterfaceSplit:      proc "c" (h: u64, l: u64) -> ^IUnityInterface,
-		RegisterInterfaceSplit: proc "c" (h: u64, l: u64, ptr: ^IUnityInterface),
+		_:                 proc "c" (guid: UnityInterfaceGUID) -> ^IUnityInterface,
+		_:                 proc "c" (guid: UnityInterfaceGUID, ptr: ^IUnityInterface),
+		GetInterface:      proc "c" (h: u64, l: u64) -> ^IUnityInterface,
+		RegisterInterface: proc "c" (h: u64, l: u64, ptr: ^IUnityInterface),
 	}
 }
 
@@ -360,9 +363,15 @@ when UNITY_EDITOR {
 UnityOdnTropInternalStaticInitialise :: proc "contextless" () {
 	// only do here things that are safe and don't require any caching
 
-	G_GlobalState.logger = cast(^IUnityLog)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityLogGUID.high, IUnityLogGUID.low))
-	G_GlobalState.profiler = cast(^IUnityProfilerV2)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityProfilerV2GUID.high, IUnityProfilerV2GUID.low))
-	G_GlobalState.memoryManager = cast(^IUnityMemoryManager)(G_GlobalState.interfaces.GetInterfaceSplit(IUnityMemoryManagerGUID.high, IUnityMemoryManagerGUID.low))
+	GetInterface :: proc "contextless" ($T: typeid, g: UnityInterfaceGUID) -> ^T {
+		interfaces := G_GlobalState.interfaces
+		intf := interfaces.GetInterface(g.high, g.low)
+		return cast(^T)(intf)
+	}
+
+	G_GlobalState.logger = GetInterface(IUnityLog, IUnityLogGUID)
+	G_GlobalState.profiler = GetInterface(IUnityProfilerV2, IUnityProfilerV2GUID)
+	G_GlobalState.memoryManager = GetInterface(IUnityMemoryManager, IUnityMemoryManagerGUID)
 }
 
 UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
