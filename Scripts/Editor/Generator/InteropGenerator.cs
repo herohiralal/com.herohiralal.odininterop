@@ -169,8 +169,8 @@ namespace OdinInterop.Editor
 
         private static void GenerateInteropCodeInternal(Type t)
         {
-            var tyName = t.FullName.Replace('+', '.').Replace(".", "___");
-            var cleanTyName = tyName == "OdinInterop___EngineBindings" ? "" : tyName;
+            var tyName = t.FullName.Replace('+', '.').Replace('.', '_');
+            var cleanTyName = tyName == "OdinInterop_EngineBindings" ? "" : tyName;
             var underScoreIfCleanTyName = cleanTyName == "" ? "" : "_";
 
             var exportedFns = t.GetMethods(BindingFlags.NonPublic | BindingFlags.Static).Where(x => !x.Name.StartsWith("odntrop_")).ToArray();

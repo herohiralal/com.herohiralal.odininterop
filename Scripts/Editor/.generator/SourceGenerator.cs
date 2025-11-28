@@ -50,7 +50,7 @@ namespace OdinInterop.SourceGenerator
         {
             var sbIndent = 0;
 
-            var tyName = classSymbol.GetFullTypeName().Replace(".", "___");
+            var tyName = classSymbol.GetFullTypeName().Replace('.', '_');
 
             var exportedMethods = classSymbol.GetMembers()
                 .OfType<IMethodSymbol>()
@@ -803,7 +803,7 @@ namespace OdinInterop.SourceGenerator
 
                     else if (useInteroperableVersion)
                     {
-                        s = "odntrop_type_" + fullName.Replace(".", "___");
+                        s = "odntrop_type_" + fullName.Replace('.', '_');
                     }
                     else
                     {
