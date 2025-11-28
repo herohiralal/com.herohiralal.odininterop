@@ -388,6 +388,8 @@ namespace OdinInterop
                 return false;
         }
 
+        // mem apis
+
         private static void MemCopy(void* destination, void* source, long size) => UnsafeUtility.MemCpy(destination, source, size);
 
         private static void MemMove(void* destination, void* source, long size) => UnsafeUtility.MemMove(destination, source, size);
@@ -397,6 +399,8 @@ namespace OdinInterop
         private static void MemClr(void* destination, long size) => UnsafeUtility.MemClear(destination, size);
 
         private static void* MemTmp(long size, int alignment) => UnsafeUtility.Malloc(size, alignment, UnityAllocator.Temp);
+
+        // panics
 
         private static void UnityOdnTropInternalPanic(String8 prefix, String8 message, String8 procedure, String8 file, int line, int column)
         {
@@ -412,6 +416,8 @@ namespace OdinInterop
             Utils.ForceCrash(ForcedCrashCategory.FatalError);
         }
 
+        // random api
+
         private static void UnityOdnTropInternalRandomInitState(int seed) => Random.InitState(seed);
 
         private static Random.State UnityOdnTropInternalRandomGetState() => Random.state;
@@ -419,6 +425,8 @@ namespace OdinInterop
         private static void UnityOdnTropInternalRandomSetState(Random.State state) => Random.state = state;
 
         private static int UnityOdnTropInternalRandomGetNextInt() => Random.Range(int.MinValue, int.MaxValue);
+
+        // allocator functionality imports
 
         public static partial Allocator UnityOdnTropInternalGetMainOdnAllocator();
         public static partial Allocator UnityOdnTropInternalGetTempOdnAllocator();

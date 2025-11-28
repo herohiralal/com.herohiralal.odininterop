@@ -582,10 +582,15 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 	messageLen += len(shortFilePath)
 	messageLen +=  /*colon*/1 +  /*line num*/7 +  /*colon*/1 +  /*column num*/7 +  /*closing paren*/1
 
+	requiresDeletion := false
 	messageCStr: cstring = ""
 	{
 		tempMem := MemTmp(i64(messageLen) + 1, align_of(u8))
-		if tempMem != nil {
+		if tempMem == nil { 	// fallback to the main allocator
+			tempMem = G_GlobalState.memoryManager.Allocate(G_GlobalState.cached.heapAllocator, auto_cast (messageLen + 1), auto_cast align_of(u8), #file, #line)
+		}
+
+		if tempMem == nil {messageCStr = "__STR_ALLOC_FAILURE__"} else {
 
 			slice := runtime.Raw_Slice {
 				data = tempMem,
@@ -604,16 +609,24 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 			strings.write_int(&sb, int(loc.column), 10)
 			strings.write_rune(&sb, ')')
 			_, err := strings.write_rune(&sb, 0)
-			if err != nil {
+			if err != nil { 	// in case of wrong size calculation
 				messageCStr = OdndTrop_Internal_CloneToCStringUsingTempAlloc(text)
+				if requiresDeletion {
+					G_GlobalState.memoryManager.Deallocate(G_GlobalState.cached.heapAllocator, rawptr(messageCStr), #file, #line)
+				}
+				requiresDeletion = false
 			} else {
 				messageCStr = cast(cstring)(tempMem)
 			}
 
-		} else {messageCStr = "__STR_ALLOC_FAILURE__"}
+		}
 	}
 
 	fileCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(shortFilePath)
 
 	G_GlobalState.logger.Log(lt, messageCStr, fileCStr, loc.line)
+
+	if requiresDeletion {
+		G_GlobalState.memoryManager.Deallocate(G_GlobalState.cached.heapAllocator, rawptr(messageCStr), #file, #line)
+	}
 }
