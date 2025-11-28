@@ -126,7 +126,7 @@ namespace OdinInterop
         {
             return new Mesh();
         }
-        private static void ClearMesh(ObjectHandle<Mesh> mesh, bool keepVertexLayout = default)
+        private static void ClearMesh(ObjectHandle<Mesh> mesh, bool keepVertexLayout = true)
         {
             if (mesh)
                 mesh.value.Clear(keepVertexLayout);
@@ -422,9 +422,9 @@ namespace OdinInterop
         }
         private static TextureFormat GetTexture2DFormat(ObjectHandle<Texture2D> texture) => texture ? texture.value.format : default;
         private static int GetTexture2DMipMapCount(ObjectHandle<Texture2D> texture) => texture ? texture.value.mipmapCount : 0;
-        private static Color GetTexture2DPixel(ObjectHandle<Texture2D> texture, int x, int y, int mipLevel = default) => texture ? texture.value.GetPixel(x, y, mipLevel) : default;
-        private static Color GetTexture2DPixelBilinear(ObjectHandle<Texture2D> texture, float u, float v, int mipLevel = default) => texture ? texture.value.GetPixelBilinear(u, v, mipLevel) : default;
-        private static void SetTexture2DPixel(ObjectHandle<Texture2D> texture, int x, int y, Color color, int mipLevel = default)
+        private static Color GetTexture2DPixel(ObjectHandle<Texture2D> texture, int x, int y, int mipLevel = 0) => texture ? texture.value.GetPixel(x, y, mipLevel) : default;
+        private static Color GetTexture2DPixelBilinear(ObjectHandle<Texture2D> texture, float u, float v, int mipLevel = 0) => texture ? texture.value.GetPixelBilinear(u, v, mipLevel) : default;
+        private static void SetTexture2DPixel(ObjectHandle<Texture2D> texture, int x, int y, Color color, int mipLevel = 0)
         {
             if (texture)
                 texture.value.SetPixel(x, y, color, mipLevel);
@@ -439,7 +439,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DPixels(ObjectHandle<Texture2D> texture, Slice<Color> pixels, int mipLevel = default)
+        private static void SetTexture2DPixels(ObjectHandle<Texture2D> texture, Slice<Color> pixels, int mipLevel = 0)
         {
             if (!texture)
                 return;
@@ -458,7 +458,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DPixels32(ObjectHandle<Texture2D> texture, Slice<Color32> pixels, int mipLevel = default)
+        private static void SetTexture2DPixels32(ObjectHandle<Texture2D> texture, Slice<Color32> pixels, int mipLevel = 0)
         {
             if (!texture)
                 return;
@@ -467,12 +467,12 @@ namespace OdinInterop
                 arr[i] = pixels.ptr[i];
             texture.value.SetPixels32(arr, mipLevel);
         }
-        private static void ApplyTexture2D(ObjectHandle<Texture2D> texture, bool updateMipmaps = default, bool makeNoLongerReadable = default)
+        private static void ApplyTexture2D(ObjectHandle<Texture2D> texture, bool updateMipmaps = true, bool makeNoLongerReadable = false)
         {
             if (texture)
                 texture.value.Apply(updateMipmaps, makeNoLongerReadable);
         }
-        private static void ReadTexture2DPixels(ObjectHandle<Texture2D> texture, Rect source, int destX, int destY, bool recalculateMipMaps = default)
+        private static void ReadTexture2DPixels(ObjectHandle<Texture2D> texture, Rect source, int destX, int destY, bool recalculateMipMaps = true)
         {
             if (texture)
                 texture.value.ReadPixels(source, destX, destY, recalculateMipMaps);
@@ -507,7 +507,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, Slice<Color> pixels, int arrayElement, int mipLevel = default)
+        private static void SetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, Slice<Color> pixels, int arrayElement, int mipLevel = 0)
         {
             if (!textureArray)
                 return;
@@ -526,7 +526,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DArrayPixels32(ObjectHandle<Texture2DArray> textureArray, Slice<Color32> pixels, int arrayElement, int mipLevel = default)
+        private static void SetTexture2DArrayPixels32(ObjectHandle<Texture2DArray> textureArray, Slice<Color32> pixels, int arrayElement, int mipLevel = 0)
         {
             if (!textureArray)
                 return;
@@ -535,7 +535,7 @@ namespace OdinInterop
                 arr[i] = pixels.ptr[i];
             textureArray.value.SetPixels32(arr, arrayElement, mipLevel);
         }
-        private static void ApplyTexture2DArray(ObjectHandle<Texture2DArray> textureArray, bool updateMipmaps = default, bool makeNoLongerReadable = default)
+        private static void ApplyTexture2DArray(ObjectHandle<Texture2DArray> textureArray, bool updateMipmaps = true, bool makeNoLongerReadable = false)
         {
             if (textureArray)
                 textureArray.value.Apply(updateMipmaps, makeNoLongerReadable);
