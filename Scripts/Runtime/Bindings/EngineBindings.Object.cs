@@ -6,6 +6,16 @@ namespace OdinInterop
     {
         // Object API
 
+        private static bool IsObjectOfType(ObjectHandle<Object> obj, String8 typeName)
+        {
+            if (!obj) return false;
+
+            var type = BindingsHelper.GetCachedType(typeName);
+            if (type == null) return false;
+
+            return type.IsAssignableFrom(obj.value.GetType());
+        }
+
         private static HideFlags GetObjectHideFlags(ObjectHandle<Object> obj)
         {
             return obj ? obj.value.hideFlags : HideFlags.None;
