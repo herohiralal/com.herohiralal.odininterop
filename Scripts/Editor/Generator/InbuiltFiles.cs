@@ -133,6 +133,12 @@ GetGameObjectLayer :: proc(go: GameObject) -> GameObjectLayer {
 SetGameObjectLayer :: proc(go: GameObject, layer: GameObjectLayer) {
 	UnityOdnTropInternalSetGameObjectLayer(go, i32(u8(layer)))
 }
+
+IsEnabled :: proc {
+    IsBehaviourEnabled,
+    IsRendererEnabled,
+    IsColliderEnabled,
+}
 ";
     }
 }
