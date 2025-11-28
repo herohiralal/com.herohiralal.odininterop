@@ -7,6 +7,7 @@ using System.Text;
 using System.Reflection;
 using System.Linq;
 using UnityEditorInternal;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace OdinInterop.Editor
 {
@@ -146,9 +147,12 @@ namespace OdinInterop.Editor
                     .AppendLine("package src")
                     .AppendLine();
 
-                foreach (var t in s_ExportedTypes)
+                while (s_ExportedTypes.Count > 0) // doing it recursively, the functions themselves might collect more types to export
                 {
-                    s_StrBld.AppendOdnTypeDef(t);
+                    var copy = s_ExportedTypes.ToArray();
+                    s_ExportedTypes.Clear();
+                    foreach (var t in copy)
+                        s_StrBld.AppendOdnTypeDef(t);
                 }
 
                 File.WriteAllText(tgtFile, s_StrBld.ToString());
@@ -214,14 +218,14 @@ namespace OdinInterop.Editor
                         for (int i = 0; i < parms.Length; i++)
                         {
                             var p = parms[i];
-                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType);
                             s_StrBld.Append(", ");
                         }
 
                         s_StrBld.Append(")");
                         if (importedFn.ReturnType != typeof(void))
                         {
-                            s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType, false);
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType);
                         }
 
                         s_StrBld.AppendLine().AppendLine();
@@ -239,14 +243,14 @@ namespace OdinInterop.Editor
                         for (int i = 0; i < parms.Length; i++)
                         {
                             var p = parms[i];
-                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, true);
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType);
                             s_StrBld.Append(", ");
                         }
 
                         s_StrBld.Append(")");
                         if (importedFn.ReturnType != typeof(void))
                         {
-                            s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType, true);
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(importedFn.ReturnType);
                         }
 
                         s_StrBld.AppendLine(" {");
@@ -291,14 +295,14 @@ namespace OdinInterop.Editor
                         for (int i = 0; i < parms.Length; i++)
                         {
                             var p = parms[i];
-                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, true);
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType);
                             s_StrBld.Append(", ");
                         }
 
                         s_StrBld.Append(")");
                         if (exportedFn.ReturnType != typeof(void))
                         {
-                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType, true);
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType);
                         }
 
                         s_StrBld.AppendLine().AppendLine();
@@ -348,7 +352,7 @@ namespace OdinInterop.Editor
                         for (int i = 0; i < parms.Length; i++)
                         {
                             var p = parms[i];
-                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType, false);
+                            s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType);
                             if (p.HasDefaultValue)
                             {
                                 if (p.ParameterType == typeof(Allocator))
@@ -366,7 +370,7 @@ namespace OdinInterop.Editor
                         s_StrBld.Append(")");
                         if (exportedFn.ReturnType != typeof(void))
                         {
-                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType, false);
+                            s_StrBld.Append(" -> ").AppendOdnTypeName(exportedFn.ReturnType);
                         }
 
                         s_StrBld.AppendLine(" {");
@@ -384,7 +388,7 @@ namespace OdinInterop.Editor
                             s_StrBld
                                 .AppendIndent()
                                 .Append("odntrop_internal_RetValXXX: ")
-                                .AppendOdnTypeName(exportedFn.ReturnType, false)
+                                .AppendOdnTypeName(exportedFn.ReturnType)
                                 .AppendLine();
                         }
 
@@ -433,10 +437,15 @@ namespace OdinInterop.Editor
             }
         }
 
+        private static HashSet<Type> s_HandledTypes = new HashSet<Type>(256);
         private static StringBuilder AppendOdnTypeDef(this StringBuilder sb, Type t)
         {
+            if (s_HandledTypes.Contains(t))
+                return sb;
+
             if (t == typeof(UnityEngine.Object))
             {
+                s_HandledTypes.Add(t);
                 return sb.AppendIndent().AppendLine("Object :: struct { id: i32 }").AppendLine();
             }
 
@@ -444,13 +453,10 @@ namespace OdinInterop.Editor
 
             if (typeof(UnityEngine.Object).IsAssignableFrom(t))
             {
-                if (!s_ExportedTypes.Contains(t.BaseType))
-                {
-                    // need to export base type first
-                    sb.AppendOdnTypeDef(t.BaseType);
-                }
+                s_ExportedTypes.Add(t.BaseType);
 
                 var baseTypeResolvedName = t.BaseType.GetResolvedOdnTypeName();
+                s_HandledTypes.Add(t);
                 return sb
                     .AppendIndent()
                     .AppendLine($"{resolvedName} :: struct {{ #subtype parent: {baseTypeResolvedName} }}")
@@ -462,7 +468,7 @@ namespace OdinInterop.Editor
             if (t.IsEnum)
             {
                 var underlyingType = t.GetEnumUnderlyingType();
-                sb.AppendIndent().Append($"{resolvedName} :: enum ").AppendOdnTypeName(underlyingType, false).AppendLine(" {");
+                sb.AppendIndent().Append($"{resolvedName} :: enum ").AppendOdnTypeName(underlyingType).AppendLine(" {");
                 s_StrBldIndent++;
                 var names = t.GetEnumNames();
                 var vals = t.GetEnumValues();
@@ -504,21 +510,61 @@ namespace OdinInterop.Editor
                     sb.AppendLine(",");
                 }
                 s_StrBldIndent--;
+                s_HandledTypes.Add(t);
                 return sb.AppendIndent().AppendLine("}").AppendLine();
             }
 
-            // todo
+            if (UnsafeUtility.IsUnmanaged(t) && t.IsValueType)
+            {
+                sb.AppendIndent().AppendLine($"{resolvedName} :: struct {{");
+                s_StrBldIndent++;
+                var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (var field in fields)
+                {
+                    sb
+                        .AppendIndent()
+                        .Append(field.Name)
+                        .Append(": ")
+                        .AppendOdnTypeName(field.FieldType)
+                        .AppendLine(",");
+                }
+                s_StrBldIndent--;
+                s_HandledTypes.Add(t);
+                return sb.AppendIndent().AppendLine("}").AppendLine();
+            }
+
+            // unknown
+            s_HandledTypes.Add(t);
             return sb.Append($"#panic(\"{resolvedName} has not been handled correctly.\")").AppendLine();
         }
 
+        private static readonly Dictionary<Type, string> s_OdnTypeNameCache = new Dictionary<Type, string>(256);
         private static string GetResolvedOdnTypeName(this Type t)
         {
-            var isInternalType = t.Namespace == "UnityEngine" || t.Namespace == "OdinInterop";
-            var resolvedName = isInternalType ? t.Name : t.FullName.Replace('+', '.').Replace('.', '_'); // for internal types, just use the type name
+            if (s_OdnTypeNameCache.TryGetValue(t, out var cachedName))
+                return cachedName;
+
+            var isSpecialNamespace = true;
+            var resolvedName = t.FullName.Replace('+', '.').Replace('.', '_');
+            if (resolvedName.StartsWith("UnityEngine_SceneManagement_")) // this must come first otherwise it matches UnityEngine_
+                resolvedName = resolvedName["UnityEngine_SceneManagement_".Length..];
+            else if (resolvedName.StartsWith("UnityEngine_"))
+                resolvedName = resolvedName["UnityEngine_".Length..];
+            else if (resolvedName.StartsWith("UnityEditor_"))
+                resolvedName = resolvedName["UnityEditor_".Length..];
+            else if (resolvedName.StartsWith("OdinInterop_"))
+                resolvedName = resolvedName["OdinInterop_".Length..];
+            else
+                isSpecialNamespace = false;
+
+            if (isSpecialNamespace) // remove underscores if it's an internal type
+                resolvedName = resolvedName.Replace("_", "");
+
+            s_OdnTypeNameCache[t] = resolvedName;
             return resolvedName;
         }
 
-        private static StringBuilder AppendOdnTypeName(this StringBuilder sb, Type t, bool useInteroperableVersion)
+        private static StringBuilder AppendOdnTypeName(this StringBuilder sb, Type t)
         {
             if (t.IsPointer || t.IsByRef)
             {
@@ -528,7 +574,7 @@ namespace OdinInterop.Editor
                 }
 
                 sb.Append("^");
-                sb.AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+                sb.AppendOdnTypeName(t.GetElementType());
                 return sb;
             }
 
@@ -604,24 +650,24 @@ namespace OdinInterop.Editor
             }
             else if (t.IsArray)
             {
-                sb.Append("[]").AppendOdnTypeName(t.GetElementType(), useInteroperableVersion);
+                sb.Append("[]").AppendOdnTypeName(t.GetElementType());
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(Slice<>))
             {
-                sb.Append("[]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
+                sb.Append("[]").AppendOdnTypeName(t.GetGenericArguments()[0]);
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
             {
-                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
+                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0]);
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(DynamicArray<>))
             {
-                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0], useInteroperableVersion);
+                sb.Append("[dynamic]").AppendOdnTypeName(t.GetGenericArguments()[0]);
             }
             else if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(ObjectHandle<>))
             {
                 var tgt = t.GetGenericArguments()[0];
-                sb.AppendOdnTypeName(tgt, useInteroperableVersion);
+                sb.AppendOdnTypeName(tgt);
             }
             else if (t == typeof(RawSlice))
             {

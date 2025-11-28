@@ -39,7 +39,7 @@ namespace OdinInterop.SourceGenerator
                 GenerateInteropCode(sb, classSymbol);
                 if (sb.Length != 0)
                 {
-                    var fileName = $"{classSymbol.GetFullTypeName().Replace(".", "___")}.g.cs";
+                    var fileName = $"{classSymbol.GetFullTypeName().Replace('.', '_')}.g.cs";
                     ctx.AddSource(fileName, SourceText.From(sb.ToString(), Encoding.UTF8));
                 }
                 sb.Clear();
@@ -635,24 +635,10 @@ namespace OdinInterop.SourceGenerator
                 goto foundResult;
             }
 
-            var fullName = type.GetFullTypeName();
-            switch (fullName)
+            if (type.IsUnmanagedType && !(type is INamedTypeSymbol nt2 && nt2.IsGenericType))
             {
-                case "UnityEngine.Vector2":
-                case "UnityEngine.Vector3":
-                case "UnityEngine.Vector4":
-                case "UnityEngine.Quaternion":
-                case "UnityEngine.Color":
-                case "OdinInterop.String8":
-                case "OdinInterop.String16":
-                case "OdinInterop.Allocator":
-                case "OdinInterop.RawSlice":
-                case "OdinInterop.RawDynamicArray":
-                case "OdinInterop.RawObjectHandle":
-                    result = InteroperabilityType.Blittable;
-                    goto foundResult;
-                default:
-                    break;
+                result = InteroperabilityType.Blittable;
+                goto foundResult;
             }
 
             if (type is INamedTypeSymbol nt &&
@@ -800,10 +786,10 @@ namespace OdinInterop.SourceGenerator
                     {
                         s = useInteroperableVersion ? "RawObjectHandle" : fullName;
                     }
-
                     else if (useInteroperableVersion)
                     {
-                        s = "odntrop_type_" + fullName.Replace('.', '_');
+                        if (type.IsUnmanagedType && !(type is INamedTypeSymbol nt2 && nt2.IsGenericType)) s = fullName;
+                        else s = "odntrop_type_" + fullName.Replace('.', '_');
                     }
                     else
                     {

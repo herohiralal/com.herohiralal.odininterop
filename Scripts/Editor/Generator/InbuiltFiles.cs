@@ -18,8 +18,8 @@ OdnTrop_Internal_GenerateRandomNumber :: proc(data: rawptr, mode: runtime.Random
 	case .Read:
 		orSt: RandomState = ---
 		if rd != nil {
-			UnityOdnTropInternalRandomGetState(&orSt.a, &orSt.b, &orSt.c, &orSt.d) // save original state
-			UnityOdnTropInternalRandomSetState(rd.a, rd.b, rd.c, rd.d) // apply custom state
+			orSt = UnityOdnTropInternalRandomGetState() // save original state
+			UnityOdnTropInternalRandomSetState(rd^) // apply custom state
 		}
 
 		switch len(p) {
@@ -55,8 +55,8 @@ OdnTrop_Internal_GenerateRandomNumber :: proc(data: rawptr, mode: runtime.Random
 		}
 
 		if rd != nil {
-			UnityOdnTropInternalRandomGetState(&rd.a, &rd.b, &rd.c, &rd.d) // store new state for the custom one
-			UnityOdnTropInternalRandomSetState(orSt.a, orSt.b, orSt.c, orSt.d) // restore original state for the default one
+			rd^ = UnityOdnTropInternalRandomGetState() // store new state for the custom one
+			UnityOdnTropInternalRandomSetState(orSt) // restore original state for the default one
 		}
 	case .Reset:
 		seed: i32 = 0
@@ -75,14 +75,14 @@ OdnTrop_Internal_GenerateRandomNumber :: proc(data: rawptr, mode: runtime.Random
 
 		orSt: RandomState = ---
 		if rd != nil {
-			UnityOdnTropInternalRandomGetState(&orSt.a, &orSt.b, &orSt.c, &orSt.d) // save original state
-			UnityOdnTropInternalRandomSetState(rd.a, rd.b, rd.c, rd.d) // apply custom state
+			orSt = UnityOdnTropInternalRandomGetState() // save original state
+			UnityOdnTropInternalRandomSetState(rd^) // apply custom state
 		}
 
 		UnityOdnTropInternalRandomInitState(seed)
 		if rd != nil {
-			UnityOdnTropInternalRandomGetState(&rd.a, &rd.b, &rd.c, &rd.d) // store new state for the custom one
-			UnityOdnTropInternalRandomSetState(orSt.a, orSt.b, orSt.c, orSt.d) // restore original state for the default one
+			rd^ = UnityOdnTropInternalRandomGetState() // store new state for the custom one
+			UnityOdnTropInternalRandomSetState(orSt) // restore original state for the default one
 		}
 
 	case .Query_Info:
