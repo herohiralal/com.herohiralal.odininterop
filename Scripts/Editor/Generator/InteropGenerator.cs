@@ -438,6 +438,7 @@ namespace OdinInterop.Editor
         }
 
         private static HashSet<Type> s_HandledTypes = new HashSet<Type>(256);
+        private static readonly MethodInfo s_AlignOfMethod = typeof(UnsafeUtility).GetMethod(nameof(UnsafeUtility.AlignOf), BindingFlags.Public | BindingFlags.Static);
         private static StringBuilder AppendOdnTypeDef(this StringBuilder sb, Type t)
         {
             if (s_HandledTypes.Contains(t))
@@ -516,6 +517,10 @@ namespace OdinInterop.Editor
 
             if (UnsafeUtility.IsUnmanaged(t) && t.IsValueType)
             {
+                sb.AppendIndent().AppendLine($"#assert(size_of({resolvedName}) == {UnsafeUtility.SizeOf(t)}, \"Size mismatch for {resolvedName}!\")");
+                sb.AppendIndent().AppendLine($"#assert(align_of({resolvedName}) == {(int)s_AlignOfMethod.MakeGenericMethod(t).Invoke(null, null)}, \"Align mismatch for {resolvedName}!\")");
+
+
                 sb.AppendIndent().AppendLine($"{resolvedName} :: struct {{");
                 s_StrBldIndent++;
                 var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -700,6 +705,10 @@ namespace OdinInterop.Editor
             else if (t == typeof(Allocator))
             {
                 sb.Append("runtime.Allocator");
+            }
+            else if (t == typeof(Color32))
+            {
+                sb.Append("Color32");
             }
             else
             {
