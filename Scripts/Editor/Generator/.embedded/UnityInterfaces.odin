@@ -1,6 +1,8 @@
 package src
 
 import "base:runtime"
+import "core:strings"
+import "core:sync"
 
 // IUnityInterface.h ================================================================================
 
@@ -556,8 +558,62 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 		lt = .Log
 	}
 
-	messageCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(text)
-	fileCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(loc.file_path)
+	@(static) pathSizeToTrim: int = 0
+	@(static) onceDo: sync.Once
+	sync.once_do(&onceDo, proc() {
+		CURRENT_FILE_PATH :: #file
+		EXPECTED_FILE_PATH :: "Assets/.odinInterop/Source/"
+
+		idx := strings.index(CURRENT_FILE_PATH, EXPECTED_FILE_PATH)
+		if idx == -1 {
+			G_GlobalState.logger.Log(.Error, "OdinInterop: Could not determine path to trim for logger. File paths will be too long.", CURRENT_FILE_PATH, #line)
+			return
+		}
+
+		pathSizeToTrim = idx
+	})
+
+	shortFilePath := loc.file_path[pathSizeToTrim:]
+
+	messageLen := len(text)
+	messageLen += len(" (from ")
+	messageLen += len(loc.procedure)
+	messageLen += len(" at ")
+	messageLen += len(shortFilePath)
+	messageLen +=  /*colon*/1 +  /*line num*/7 +  /*colon*/1 +  /*column num*/7 +  /*closing paren*/1
+
+	messageCStr: cstring = ""
+	{
+		tempMem := MemTmp(i64(messageLen) + 1, align_of(u8))
+		if tempMem != nil {
+
+			slice := runtime.Raw_Slice {
+				data = tempMem,
+				len  = auto_cast (messageLen + 1),
+			}
+
+			sb := strings.builder_from_bytes(transmute([]u8)slice)
+			strings.write_string(&sb, text)
+			strings.write_string(&sb, " (from ")
+			strings.write_string(&sb, loc.procedure)
+			strings.write_string(&sb, " at ")
+			strings.write_string(&sb, shortFilePath)
+			strings.write_rune(&sb, ':')
+			strings.write_int(&sb, int(loc.line), 10)
+			strings.write_rune(&sb, ':')
+			strings.write_int(&sb, int(loc.column), 10)
+			strings.write_rune(&sb, ')')
+			_, err := strings.write_rune(&sb, 0)
+			if err != nil {
+				messageCStr = OdndTrop_Internal_CloneToCStringUsingTempAlloc(text)
+			} else {
+				messageCStr = cast(cstring)(tempMem)
+			}
+
+		} else {messageCStr = "__STR_ALLOC_FAILURE__"}
+	}
+
+	fileCStr := OdndTrop_Internal_CloneToCStringUsingTempAlloc(shortFilePath)
 
 	G_GlobalState.logger.Log(lt, messageCStr, fileCStr, loc.line)
 }

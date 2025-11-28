@@ -12,7 +12,7 @@ namespace OdinInterop.Editor
 {
     internal static class InteropGenerator
     {
-        internal static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Source", "OdinInterop"));
+        internal static readonly string ODIN_INTEROP_OUT_DIR = Path.GetFullPath(Path.Combine(Application.dataPath, ".odinInterop", "Source"));
 
         private static HashSet<Type> s_ExportedTypes = new HashSet<Type>(256); // to create in odin
 
