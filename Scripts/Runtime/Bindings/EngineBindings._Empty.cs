@@ -1,6 +1,6 @@
 namespace OdinInterop
 {
-    internal static partial class EngineBindings
+    internal static unsafe partial class EngineBindings
     {
     }
 }
