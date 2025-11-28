@@ -382,7 +382,6 @@ namespace OdinInterop
             return slice;
         }
 
-#if false // the source generator can't currently handle out parameters that require conversions
         private static bool TryGetComponent(ObjectHandle<GameObject> gameObject, String8 typeName, out ObjectHandle<Component> component)
         {
             component = default;
@@ -398,7 +397,6 @@ namespace OdinInterop
             component = comp;
             return true;
         }
-#endif
 
         private static bool CompareGameObjectTag(ObjectHandle<GameObject> gameObject, String8 tag)
         {

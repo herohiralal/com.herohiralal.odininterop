@@ -173,16 +173,94 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent).AppendLine("{");
                 sbIndent++;
 
+                // conversions to non-interoperable (if any)
+                foreach (var par in method.Parameters)
+                {
+                    var rk = par.RefKind;
+                    switch (par.Type.GetInteroperabilityType())
+                    {
+                        case InteroperabilityType.Blittable:
+                            // no conversion needed
+                            break;
+                        case InteroperabilityType.AutoConverting:
+                            // by val will be copied
+                            // by in will be copied (special case in AppendParameters)
+                            // by out will be created (special case in AppendParameters)
+                            if (rk == RefKind.Ref)
+                            {
+                                sb.AppendIndent(sbIndent)
+                                    .AppendTypeName(par.Type, false)
+                                    .Append(" ")
+                                    .Append(par.Name)
+                                    .Append("_odntrop_internal_proxy")
+                                    .Append(" = ")
+                                    .Append(par.Name)
+                                    .AppendLine(";"); // direct assignment
+                            }
+
+                            break;
+                        case InteroperabilityType.CustomMarshalled:
+                            // TODO handle custom marshalled types
+                            break;
+                    }
+                }
+
+                // actual method call
                 sb.AppendIndent(sbIndent);
                 if (!method.ReturnsVoid)
-                    sb.Append("return ");
-                if (method.ReturnsByRef)
-                    sb.Append("ref ");
-                else if (method.ReturnsByRefReadonly)
-                    sb.Append("ref readonly ");
+                {
+                    if (method.ReturnsByRef)
+                        sb.Append("ref ");
+                    else if (method.ReturnsByRefReadonly)
+                        sb.Append("ref readonly ");
+                    sb.Append("var odntrop_internal_RetValXXX = ");
+                    if (method.ReturnsByRef)
+                        sb.Append("ref ");
+                    else if (method.ReturnsByRefReadonly)
+                        sb.Append("ref readonly ");
+                }
                 sb.Append(method.Name).Append("(");
                 sb.AppendParameters(method.Parameters, null);
                 sb.AppendLine(");");
+
+                // conversions to non-interoperable (if any)
+                foreach (var par in method.Parameters)
+                {
+                    var rk = par.RefKind;
+                    switch (par.Type.GetInteroperabilityType())
+                    {
+                        case InteroperabilityType.Blittable:
+                            // no conversion needed
+                            break;
+                        case InteroperabilityType.AutoConverting:
+                            if (rk == RefKind.Out || rk == RefKind.Ref)
+                            {
+                                sb.AppendIndent(sbIndent)
+                                    .Append(par.Name)
+                                    .Append(" = ")
+                                    .Append(par.Name)
+                                    .AppendLine("_odntrop_internal_proxy;");
+                            }
+
+                            break;
+                        case InteroperabilityType.CustomMarshalled:
+                            // TODO handle custom marshalled types
+                            break;
+                    }
+                }
+
+                // return statement
+                if (!method.ReturnsVoid)
+                {
+                    sb.AppendIndent(sbIndent);
+                    sb.Append("return ");
+                    if (method.ReturnsByRef)
+                        sb.Append("ref ");
+                    else if (method.ReturnsByRefReadonly)
+                        sb.Append("ref readonly ");
+                    sb.AppendLine("odntrop_internal_RetValXXX;");
+                    // TODO handle non-converting and non-blittable
+                }
 
                 sbIndent--;
                 sb.AppendIndent(sbIndent).AppendLine("}");
@@ -437,7 +515,14 @@ namespace OdinInterop.SourceGenerator
         }
     }
 
-    public static class Extensions
+    internal enum InteroperabilityType
+    {
+        Blittable, // most interoperable; has a 1:1 memory representation
+        AutoConverting, // can be automatically converted by the runtime (arrays, lists, etc)
+        CustomMarshalled, // requires custom conversions
+    }
+
+    internal static class Extensions
     {
         public static StringBuilder AppendIndent(this StringBuilder sb, int indentVal)
         {
@@ -462,23 +547,32 @@ namespace OdinInterop.SourceGenerator
 
         public static StringBuilder AppendParameters(this StringBuilder sb, IEnumerable<IParameterSymbol> parameters, bool? useInteroperableVersion)
         {
-            var paramArray = parameters.ToArray();
-            for (int i = 0; i < paramArray.Length; i++)
+            var addComma = false;
+            foreach (var par in parameters)
             {
-                if (i > 0) sb.Append(", ");
+                if (addComma) sb.Append(", ");
+                addComma = true;
 
-                switch (paramArray[i].RefKind)
+                var interoperability = par.Type.GetInteroperabilityType();
+                var varIsProxy = interoperability != InteroperabilityType.Blittable;
+                switch (par.RefKind)
                 {
                     case RefKind.None:
+                        varIsProxy = varIsProxy && (interoperability != InteroperabilityType.AutoConverting);
                         break;
                     case RefKind.Ref:
                         sb.Append("ref ");
                         break;
                     case RefKind.Out:
                         sb.Append("out ");
+                        if (varIsProxy && !useInteroperableVersion.HasValue)
+                            sb.Append("var ");
                         break;
                     case RefKind.In:
-                        sb.Append("in ");
+                        // only pass by by in if blittable, otherwise let it copy
+                        if (useInteroperableVersion.HasValue || !varIsProxy)
+                            sb.Append("in ");
+
                         break;
                     default:
                         sb.Append("#ERROR_REF_KIND# ");
@@ -487,14 +581,97 @@ namespace OdinInterop.SourceGenerator
 
                 if (useInteroperableVersion.HasValue)
                 {
-                    sb.AppendTypeName(paramArray[i].Type, useInteroperableVersion.Value);
+                    sb.AppendTypeName(par.Type, useInteroperableVersion.Value);
                     sb.Append(" ");
                 }
-
-                sb.Append(paramArray[i].Name);
+                sb.Append(par.Name);
+                if (varIsProxy && !useInteroperableVersion.HasValue)
+                {
+                    sb.Append($"_odntrop_internal_proxy");
+                }
             }
 
             return sb;
+        }
+
+        private static Dictionary<ITypeSymbol, InteroperabilityType> s_InteroperabilityTypeCache = new Dictionary<ITypeSymbol, InteroperabilityType>(SymbolEqualityComparer.Default);
+        internal static InteroperabilityType GetInteroperabilityType(this ITypeSymbol type) // whether any conversions are required
+        {
+            if (s_InteroperabilityTypeCache.TryGetValue(type, out var cached))
+            {
+                return cached;
+            }
+
+            InteroperabilityType? result = null;
+            switch (type.SpecialType)
+            {
+                case SpecialType.System_Void:
+                case SpecialType.System_Byte:
+                case SpecialType.System_SByte:
+                case SpecialType.System_Int16:
+                case SpecialType.System_UInt16:
+                case SpecialType.System_Int32:
+                case SpecialType.System_UInt32:
+                case SpecialType.System_Int64:
+                case SpecialType.System_UInt64:
+                case SpecialType.System_Single:
+                case SpecialType.System_Double:
+                case SpecialType.System_Boolean:
+                    result = InteroperabilityType.Blittable;
+                    goto foundResult;
+                default:
+                    break;
+            }
+
+            if (type is IPointerTypeSymbol)
+            {
+                result = InteroperabilityType.Blittable;
+                goto foundResult;
+            }
+
+            if (type.TypeKind == TypeKind.Enum)
+            {
+                result = InteroperabilityType.Blittable;
+                goto foundResult;
+            }
+
+            var fullName = type.GetFullTypeName();
+            switch (fullName)
+            {
+                case "UnityEngine.Vector2":
+                case "UnityEngine.Vector3":
+                case "UnityEngine.Vector4":
+                case "UnityEngine.Quaternion":
+                case "UnityEngine.Color":
+                case "OdinInterop.String8":
+                case "OdinInterop.String16":
+                case "OdinInterop.Allocator":
+                case "OdinInterop.RawSlice":
+                case "OdinInterop.RawDynamicArray":
+                case "OdinInterop.RawObjectHandle":
+                    result = InteroperabilityType.Blittable;
+                    goto foundResult;
+                default:
+                    break;
+            }
+
+            if (type is INamedTypeSymbol nt &&
+                nt.OriginalDefinition.SpecialType == SpecialType.None)
+            {
+                var odStr = nt.OriginalDefinition.ToString();
+                if (odStr == "OdinInterop.DynamicArray<T>" ||
+                    odStr == "OdinInterop.Slice<T>" ||
+                    odStr == "OdinInterop.ObjectHandle<T>")
+                {
+                    result = InteroperabilityType.AutoConverting;
+                    goto foundResult;
+                }
+            }
+
+        foundResult:
+            var res2 = result ?? InteroperabilityType.CustomMarshalled;
+            s_InteroperabilityTypeCache[type] = res2;
+            return res2;
         }
 
         public static StringBuilder AppendTypeName(this StringBuilder sb, ITypeSymbol type, bool useInteroperableVersion)
@@ -647,9 +824,13 @@ namespace OdinInterop.SourceGenerator
             }
         }
 
+        private static Dictionary<ISymbol, string> s_FullTypeNameCache = new Dictionary<ISymbol, string>(SymbolEqualityComparer.Default);
         public static string GetFullTypeName(this ISymbol symbol)
         {
             if (symbol == null) return string.Empty;
+
+            if (s_FullTypeNameCache.TryGetValue(symbol, out var cached))
+                return cached;
 
             var parts = new List<string>();
 
@@ -658,13 +839,7 @@ namespace OdinInterop.SourceGenerator
             {
                 var name = nts.Name;
                 if (nts.TypeArguments.Length != 0)
-                {
-                    var args = nts.TypeArguments
-                        .Select(arg => arg.GetFullTypeName()) // recursive
-                        .ToArray();
-
-                    name = $"{name}<{string.Join(", ", args)}>";
-                }
+                    name = $"{name}<{string.Join(", ", nts.TypeArguments.Select(arg => arg.GetFullTypeName()))}>"; // recursive
 
                 parts.Insert(0, name);
                 current = nts.ContainingType;
@@ -685,21 +860,33 @@ namespace OdinInterop.SourceGenerator
 
                 if (nsParts.Count > 0)
                 {
-                    return string.Join(".", nsParts) + "." + typeName;
+                    var fullName = string.Join(".", nsParts) + "." + typeName;
+                    s_FullTypeNameCache[symbol] = fullName;
+                    return fullName;
                 }
             }
 
+            s_FullTypeNameCache[symbol] = typeName;
             return typeName;
         }
 
+        private static Dictionary<ITypeSymbol, bool> s_UnityObjectsCache = new Dictionary<ITypeSymbol, bool>(SymbolEqualityComparer.Default);
         public static bool IsUnityObject(this ITypeSymbol type)
         {
             if (type == null) return false;
 
-            if (type.GetFullTypeName() == "UnityEngine.Object")
-                return true;
+            if (s_UnityObjectsCache.TryGetValue(type, out var cached))
+                return cached;
 
-            return type.BaseType.IsUnityObject();
+            if (type.GetFullTypeName() == "UnityEngine.Object")
+            {
+                s_UnityObjectsCache[type] = true;
+                return true;
+            }
+
+            var isObj = type.BaseType.IsUnityObject();
+            s_UnityObjectsCache[type] = isObj;
+            return isObj;
         }
     }
 }
