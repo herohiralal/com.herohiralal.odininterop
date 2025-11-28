@@ -1,4 +1,8 @@
 using UnityEngine;
+#if !UNITY_6000_0_OR_NEWER
+// alias for older Unity versions
+using PhysicsMaterial = UnityEngine.PhysicMaterial;
+#endif
 
 namespace OdinInterop
 {
