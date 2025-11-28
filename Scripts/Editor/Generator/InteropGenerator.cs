@@ -586,6 +586,8 @@ namespace OdinInterop.Editor
             var resolvedName = t.FullName.Replace('+', '.').Replace('.', '_');
             if (resolvedName.StartsWith("UnityEngine_SceneManagement_")) // this must come first otherwise it matches UnityEngine_
                 resolvedName = resolvedName["UnityEngine_SceneManagement_".Length..];
+            else if (resolvedName.StartsWith("UnityEngine_Audio_"))
+                resolvedName = resolvedName["UnityEngine_Audio_".Length..];
             else if (resolvedName.StartsWith("UnityEngine_UI_"))
                 resolvedName = resolvedName["UnityEngine_UI_".Length..];
             else if (resolvedName.StartsWith("UnityEngine_Rendering_"))
