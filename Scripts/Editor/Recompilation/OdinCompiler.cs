@@ -508,7 +508,7 @@ namespace OdinInterop.Editor
 #elif UNITY_EDITOR_LINUX
                     "linux-x86_64";
 #else
-                    "unknown";  
+                    "unknown";
 #endif
 
                 // now link to a shared lib

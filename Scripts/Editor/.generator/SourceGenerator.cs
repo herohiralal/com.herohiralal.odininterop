@@ -79,7 +79,7 @@ namespace OdinInterop.SourceGenerator
             sb.AppendLine("using UnityEngine;");
             sb.AppendLine();
 
-            // namespace 
+            // namespace
             if (!string.IsNullOrEmpty(classSymbol.ContainingNamespace?.Name) &&
                 classSymbol.ContainingNamespace.Name != "<global namespace>")
             {

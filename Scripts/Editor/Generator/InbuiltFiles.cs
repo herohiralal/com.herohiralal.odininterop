@@ -1,8 +1,8 @@
 namespace OdinInterop.Editor
 {
-	internal static class InteropGeneratorInbuiltFiles
-	{
-		internal const string ENGINE_BINDINGS_APPEND = @"
+    internal static class InteropGeneratorInbuiltFiles
+    {
+        internal const string ENGINE_BINDINGS_APPEND = @"
 UnityPanic :: proc(prefix, message: string, loc := #caller_location) -> ! {
 	UnityOdnTropInternalPanic(prefix, message, loc.procedure, loc.file_path, loc.line, loc.column)
 	panic(message)
@@ -134,5 +134,5 @@ SetGameObjectLayer :: proc(go: GameObject, layer: GameObjectLayer) {
 	UnityOdnTropInternalSetGameObjectLayer(go, i32(u8(layer)))
 }
 ";
-	}
+    }
 }
