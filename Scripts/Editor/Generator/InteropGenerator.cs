@@ -388,6 +388,10 @@ namespace OdinInterop.Editor
                                 {
                                     s_StrBld.Append(" = quaternion128(1)");
                                 }
+                                else if (p.ParameterType.IsEnum)
+                                {
+                                    s_StrBld.Append(" = .").Append(p.DefaultValue.ToString());
+                                }
                                 else
                                 {
                                     s_StrBld.Append(" = {}");

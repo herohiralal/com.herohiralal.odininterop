@@ -31,39 +31,45 @@ namespace OdinInterop
         {
             if (!renderer)
                 return default;
-            var materials = renderer.value.materials;
-            var slice = new Slice<ObjectHandle<Material>>(materials.Length, allocator);
-            for (var i = 0; i < materials.Length; i++)
-                slice.ptr[i] = materials[i];
+            BindingsHelper.tempMaterialsList.Clear();
+            renderer.value.GetMaterials(BindingsHelper.tempMaterialsList);
+            var slice = new Slice<ObjectHandle<Material>>(BindingsHelper.tempMaterialsList.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempMaterialsList.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempMaterialsList[i];
+            BindingsHelper.tempMaterialsList.Clear();
             return slice;
         }
         private static void SetRendererMaterials(ObjectHandle<Renderer> renderer, Slice<ObjectHandle<Material>> materials)
         {
             if (!renderer)
                 return;
-            var arr = new Material[(int)materials.len];
+            BindingsHelper.tempMaterialsList.Clear();
             for (var i = 0; i < (int)materials.len; i++)
-                arr[i] = materials.ptr[i];
-            renderer.value.materials = arr;
+                BindingsHelper.tempMaterialsList.Add(materials.ptr[i]);
+            renderer.value.SetMaterials(BindingsHelper.tempMaterialsList);
+            BindingsHelper.tempMaterialsList.Clear();
         }
         private static Slice<ObjectHandle<Material>> GetRendererSharedMaterials(ObjectHandle<Renderer> renderer, Allocator allocator)
         {
             if (!renderer)
                 return default;
-            var materials = renderer.value.sharedMaterials;
-            var slice = new Slice<ObjectHandle<Material>>(materials.Length, allocator);
-            for (var i = 0; i < materials.Length; i++)
-                slice.ptr[i] = materials[i];
+            BindingsHelper.tempMaterialsList.Clear();
+            renderer.value.GetSharedMaterials(BindingsHelper.tempMaterialsList);
+            var slice = new Slice<ObjectHandle<Material>>(BindingsHelper.tempMaterialsList.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempMaterialsList.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempMaterialsList[i];
+            BindingsHelper.tempMaterialsList.Clear();
             return slice;
         }
         private static void SetRendererSharedMaterials(ObjectHandle<Renderer> renderer, Slice<ObjectHandle<Material>> materials)
         {
             if (!renderer)
                 return;
-            var arr = new Material[(int)materials.len];
+            BindingsHelper.tempMaterialsList.Clear();
             for (var i = 0; i < (int)materials.len; i++)
-                arr[i] = materials.ptr[i];
-            renderer.value.sharedMaterials = arr;
+                BindingsHelper.tempMaterialsList.Add(materials.ptr[i]);
+            renderer.value.SetSharedMaterials(BindingsHelper.tempMaterialsList);
+            BindingsHelper.tempMaterialsList.Clear();
         }
         private static int GetRendererSortingLayerID(ObjectHandle<Renderer> renderer) => renderer ? renderer.value.sortingLayerID : 0;
         private static void SetRendererSortingLayerID(ObjectHandle<Renderer> renderer, int layerID)
@@ -77,11 +83,11 @@ namespace OdinInterop
             if (renderer)
                 renderer.value.sortingOrder = order;
         }
-        private static int GetRendererRenderingLayerMask(ObjectHandle<Renderer> renderer) => (int)(renderer ? renderer.value.renderingLayerMask : 0);
-        private static void SetRendererRenderingLayerMask(ObjectHandle<Renderer> renderer, int mask)
+        private static uint GetRendererRenderingLayerMask(ObjectHandle<Renderer> renderer) => renderer ? renderer.value.renderingLayerMask : 0;
+        private static void SetRendererRenderingLayerMask(ObjectHandle<Renderer> renderer, uint mask)
         {
             if (renderer)
-                renderer.value.renderingLayerMask = (uint)mask;
+                renderer.value.renderingLayerMask = mask;
         }
         private static bool GetRendererReceiveShadows(ObjectHandle<Renderer> renderer) => renderer ? renderer.value.receiveShadows : false;
         private static void SetRendererReceiveShadows(ObjectHandle<Renderer> renderer, bool receive)
@@ -95,17 +101,6 @@ namespace OdinInterop
             if (renderer)
                 renderer.value.shadowCastingMode = mode;
         }
-
-        // MeshRenderer API
-
-        private static ObjectHandle<MeshFilter> GetMeshFilterFromMeshRenderer(ObjectHandle<MeshRenderer> meshRenderer)
-        {
-            if (!meshRenderer)
-                return default;
-            return meshRenderer.value.GetComponent<MeshFilter>();
-        }
-
-        // MeshFilter API
 
         private static ObjectHandle<Mesh> GetMeshFilterMesh(ObjectHandle<MeshFilter> meshFilter) => meshFilter ? meshFilter.value.mesh : default;
         private static void SetMeshFilterMesh(ObjectHandle<MeshFilter> meshFilter, ObjectHandle<Mesh> mesh)
@@ -122,10 +117,7 @@ namespace OdinInterop
 
         // Mesh API
 
-        private static ObjectHandle<Mesh> CreateMesh()
-        {
-            return new Mesh();
-        }
+        private static ObjectHandle<Mesh> CreateMesh() => new Mesh();
         private static void ClearMesh(ObjectHandle<Mesh> mesh, bool keepVertexLayout = true)
         {
             if (mesh)
@@ -148,78 +140,89 @@ namespace OdinInterop
         {
             if (!mesh)
                 return default;
-            var vertices = mesh.value.vertices;
-            var slice = new Slice<Vector3>(vertices.Length, allocator);
-            for (var i = 0; i < vertices.Length; i++)
-                slice.ptr[i] = vertices[i];
+            BindingsHelper.tempVector3List.Clear();
+            mesh.value.GetVertices(BindingsHelper.tempVector3List);
+            var slice = new Slice<Vector3>(BindingsHelper.tempVector3List.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempVector3List.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempVector3List[i];
+            BindingsHelper.tempVector3List.Clear();
             return slice;
         }
         private static void SetMeshVertices(ObjectHandle<Mesh> mesh, Slice<Vector3> vertices)
         {
             if (!mesh)
                 return;
-            var arr = new Vector3[(int)vertices.len];
+            BindingsHelper.tempVector3List.Clear();
             for (var i = 0; i < (int)vertices.len; i++)
-                arr[i] = vertices.ptr[i];
-            mesh.value.vertices = arr;
+                BindingsHelper.tempVector3List.Add(vertices.ptr[i]);
+            mesh.value.SetVertices(BindingsHelper.tempVector3List);
+            BindingsHelper.tempVector3List.Clear();
         }
         private static Slice<Vector3> GetMeshNormals(ObjectHandle<Mesh> mesh, Allocator allocator)
         {
             if (!mesh)
                 return default;
-            var normals = mesh.value.normals;
-            var slice = new Slice<Vector3>(normals.Length, allocator);
-            for (var i = 0; i < normals.Length; i++)
-                slice.ptr[i] = normals[i];
+            BindingsHelper.tempVector3List.Clear();
+            mesh.value.GetNormals(BindingsHelper.tempVector3List);
+            var slice = new Slice<Vector3>(BindingsHelper.tempVector3List.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempVector3List.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempVector3List[i];
+            BindingsHelper.tempVector3List.Clear();
             return slice;
         }
         private static void SetMeshNormals(ObjectHandle<Mesh> mesh, Slice<Vector3> normals)
         {
             if (!mesh)
                 return;
-            var arr = new Vector3[(int)normals.len];
+            BindingsHelper.tempVector3List.Clear();
             for (var i = 0; i < (int)normals.len; i++)
-                arr[i] = normals.ptr[i];
-            mesh.value.normals = arr;
+                BindingsHelper.tempVector3List.Add(normals.ptr[i]);
+            mesh.value.SetNormals(BindingsHelper.tempVector3List);
+            BindingsHelper.tempVector3List.Clear();
         }
         private static Slice<Vector2> GetMeshUVs(ObjectHandle<Mesh> mesh, int channel, Allocator allocator)
         {
             if (!mesh)
                 return default;
-            var uvs = new System.Collections.Generic.List<Vector2>();
-            mesh.value.GetUVs(channel, uvs);
-            var slice = new Slice<Vector2>(uvs.Count, allocator);
-            for (var i = 0; i < uvs.Count; i++)
-                slice.ptr[i] = uvs[i];
+            BindingsHelper.tempVector2List.Clear();
+            mesh.value.GetUVs(channel, BindingsHelper.tempVector2List);
+            var slice = new Slice<Vector2>(BindingsHelper.tempVector2List.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempVector2List.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempVector2List[i];
+            BindingsHelper.tempVector2List.Clear();
             return slice;
         }
         private static void SetMeshUVs(ObjectHandle<Mesh> mesh, int channel, Slice<Vector2> uvs)
         {
             if (!mesh)
                 return;
-            var list = new System.Collections.Generic.List<Vector2>((int)uvs.len);
+            BindingsHelper.tempVector2List.Clear();
             for (var i = 0; i < (int)uvs.len; i++)
-                list.Add(uvs.ptr[i]);
-            mesh.value.SetUVs(channel, list);
+                BindingsHelper.tempVector2List.Add(uvs.ptr[i]);
+            mesh.value.SetUVs(channel, BindingsHelper.tempVector2List);
+            BindingsHelper.tempVector2List.Clear();
         }
         private static Slice<int> GetMeshTriangles(ObjectHandle<Mesh> mesh, int submesh, Allocator allocator)
         {
             if (!mesh)
                 return default;
-            var triangles = mesh.value.GetTriangles(submesh);
-            var slice = new Slice<int>(triangles.Length, allocator);
-            for (var i = 0; i < triangles.Length; i++)
-                slice.ptr[i] = triangles[i];
+            BindingsHelper.tempIntList.Clear();
+            mesh.value.GetTriangles(BindingsHelper.tempIntList, submesh);
+            var slice = new Slice<int>(BindingsHelper.tempIntList.Count, allocator);
+            for (var i = 0; i < BindingsHelper.tempIntList.Count; i++)
+                slice.ptr[i] = BindingsHelper.tempIntList[i];
+            BindingsHelper.tempIntList.Clear();
             return slice;
         }
         private static void SetMeshTriangles(ObjectHandle<Mesh> mesh, Slice<int> triangles, int submesh)
         {
             if (!mesh)
                 return;
-            var arr = new int[(int)triangles.len];
+            BindingsHelper.tempIntList.Clear();
             for (var i = 0; i < (int)triangles.len; i++)
-                arr[i] = triangles.ptr[i];
-            mesh.value.SetTriangles(arr, submesh);
+                BindingsHelper.tempIntList.Add(triangles.ptr[i]);
+            mesh.value.SetTriangles(BindingsHelper.tempIntList, submesh);
+            BindingsHelper.tempIntList.Clear();
         }
         private static void RecalculateMeshBounds(ObjectHandle<Mesh> mesh)
         {
@@ -247,81 +250,10 @@ namespace OdinInterop
                 mesh.value.UploadMeshData(markNoLongerReadable);
         }
 
-        // Material API
+        // GlobalKeyword API
 
-        private static ObjectHandle<Material> CreateMaterial(ObjectHandle<Shader> shader)
-        {
-            if (!shader)
-                return default;
-            return new Material(shader);
-        }
-        private static ObjectHandle<Material> CreateMaterialFromName(String8 shaderName)
-        {
-            var shader = Shader.Find(shaderName.ToString());
-            if (!shader)
-                return default;
-            return new Material(shader);
-        }
-        private static ObjectHandle<Shader> GetMaterialShader(ObjectHandle<Material> material) => material ? material.value.shader : default;
-        private static void SetMaterialShader(ObjectHandle<Material> material, ObjectHandle<Shader> shader)
-        {
-            if (material)
-                material.value.shader = shader;
-        }
-        private static Color GetMaterialColor(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetColor(propertyName.ToString()) : default;
-        private static void SetMaterialColor(ObjectHandle<Material> material, String8 propertyName, Color color)
-        {
-            if (material)
-                material.value.SetColor(propertyName.ToString(), color);
-        }
-        private static float GetMaterialFloat(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetFloat(propertyName.ToString()) : 0f;
-        private static void SetMaterialFloat(ObjectHandle<Material> material, String8 propertyName, float value)
-        {
-            if (material)
-                material.value.SetFloat(propertyName.ToString(), value);
-        }
-        private static int GetMaterialInt(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetInt(propertyName.ToString()) : 0;
-        private static void SetMaterialInt(ObjectHandle<Material> material, String8 propertyName, int value)
-        {
-            if (material)
-                material.value.SetInt(propertyName.ToString(), value);
-        }
-        private static Vector4 GetMaterialVector(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetVector(propertyName.ToString()) : default;
-        private static void SetMaterialVector(ObjectHandle<Material> material, String8 propertyName, Vector4 value)
-        {
-            if (material)
-                material.value.SetVector(propertyName.ToString(), value);
-        }
-        private static ObjectHandle<Texture> GetMaterialTexture(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetTexture(propertyName.ToString()) : default;
-        private static void SetMaterialTexture(ObjectHandle<Material> material, String8 propertyName, ObjectHandle<Texture> texture)
-        {
-            if (material)
-                material.value.SetTexture(propertyName.ToString(), texture);
-        }
-        private static Vector2 GetMaterialTextureOffset(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetTextureOffset(propertyName.ToString()) : default;
-        private static void SetMaterialTextureOffset(ObjectHandle<Material> material, String8 propertyName, Vector2 offset)
-        {
-            if (material)
-                material.value.SetTextureOffset(propertyName.ToString(), offset);
-        }
-        private static Vector2 GetMaterialTextureScale(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.GetTextureScale(propertyName.ToString()) : default;
-        private static void SetMaterialTextureScale(ObjectHandle<Material> material, String8 propertyName, Vector2 scale)
-        {
-            if (material)
-                material.value.SetTextureScale(propertyName.ToString(), scale);
-        }
-        private static bool HasMaterialProperty(ObjectHandle<Material> material, String8 propertyName) => material ? material.value.HasProperty(propertyName.ToString()) : false;
-        private static void EnableMaterialKeyword(ObjectHandle<Material> material, String8 keyword)
-        {
-            if (material)
-                material.value.EnableKeyword(keyword.ToString());
-        }
-        private static void DisableMaterialKeyword(ObjectHandle<Material> material, String8 keyword)
-        {
-            if (material)
-                material.value.DisableKeyword(keyword.ToString());
-        }
-        private static bool IsMaterialKeywordEnabled(ObjectHandle<Material> material, String8 keyword) => material ? material.value.IsKeywordEnabled(keyword.ToString()) : false;
+        private static GlobalKeyword CreateGlobalKeyword(String8 name) => GlobalKeyword.Create(name.ToString());
+        private static String8 GetGlobalKeywordName(GlobalKeyword kw, Allocator allocator) => new String8(kw.name, allocator);
 
         // Shader API
 
@@ -338,17 +270,104 @@ namespace OdinInterop
         private static void SetGlobalShaderMaximumLOD(int lod) => Shader.globalMaximumLOD = lod;
         private static String8 GetGlobalShaderRenderPipeline(Allocator allocator) => new String8(Shader.globalRenderPipeline, allocator);
         private static void SetGlobalShaderRenderPipeline(String8 renderPipelineName) => Shader.globalRenderPipeline = renderPipelineName.ToString();
-        private static void EnableShaderKeyword(String8 keyword) => Shader.EnableKeyword(keyword.ToString());
-        private static void DisableShaderKeyword(String8 keyword) => Shader.DisableKeyword(keyword.ToString());
-        private static bool IsShaderKeywordEnabled(String8 keyword) => Shader.IsKeywordEnabled(keyword.ToString());
-        private static void SetGlobalShaderFloat(String8 propertyName, float value) => Shader.SetGlobalFloat(propertyName.ToString(), value);
-        private static void SetGlobalShaderInt(String8 propertyName, int value) => Shader.SetGlobalInt(propertyName.ToString(), value);
-        private static void SetGlobalShaderVector(String8 propertyName, Vector4 value) => Shader.SetGlobalVector(propertyName.ToString(), value);
-        private static void SetGlobalShaderColor(String8 propertyName, Color value) => Shader.SetGlobalColor(propertyName.ToString(), value);
-        private static void SetGlobalShaderMatrix(String8 propertyName, Matrix4x4 value) => Shader.SetGlobalMatrix(propertyName.ToString(), value);
-        private static void SetGlobalShaderTexture(String8 propertyName, ObjectHandle<Texture> texture) => Shader.SetGlobalTexture(propertyName.ToString(), texture);
-        private static int GetShaderPropertyToID(String8 propertyName) => Shader.PropertyToID(propertyName.ToString());
+        private static int GetShaderPropertyId(String8 propertyName) => Shader.PropertyToID(propertyName.ToString());
+        private static void EnableShaderKeyword(GlobalKeyword keyword) => Shader.EnableKeyword(keyword);
+        private static void DisableShaderKeyword(GlobalKeyword keyword) => Shader.DisableKeyword(keyword);
+        private static bool IsShaderKeywordEnabled(GlobalKeyword keyword) => Shader.IsKeywordEnabled(keyword);
+        private static float GetGlobalShaderFloat(int propertyID) => Shader.GetGlobalFloat(propertyID);
+        private static void SetGlobalShaderFloat(int propertyID, float value) => Shader.SetGlobalFloat(propertyID, value);
+        private static int GetGlobalShaderInt(int propertyID) => Shader.GetGlobalInt(propertyID);
+        private static void SetGlobalShaderInt(int propertyID, int value) => Shader.SetGlobalInt(propertyID, value);
+        private static Vector4 GetGlobalShaderVector(int propertyID) => Shader.GetGlobalVector(propertyID);
+        private static void SetGlobalShaderVector(int propertyID, Vector4 value) => Shader.SetGlobalVector(propertyID, value);
+        private static Color GetGlobalShaderColor(int propertyID) => Shader.GetGlobalColor(propertyID);
+        private static void SetGlobalShaderColor(int propertyID, Color value) => Shader.SetGlobalColor(propertyID, value);
+        private static Matrix4x4 GetGlobalShaderMatrix(int propertyID) => Shader.GetGlobalMatrix(propertyID);
+        private static void SetGlobalShaderMatrix(int propertyID, Matrix4x4 value) => Shader.SetGlobalMatrix(propertyID, value);
+        private static ObjectHandle<Texture> GetGlobalShaderTexture(int propertyID) => Shader.GetGlobalTexture(propertyID);
+        private static void SetGlobalShaderTexture(int propertyID, ObjectHandle<Texture> value) => Shader.SetGlobalTexture(propertyID, value);
         private static void WarmupAllShaders() => Shader.WarmupAllShaders();
+
+        // Material API
+
+        private static ObjectHandle<Material> CreateMaterial(ObjectHandle<Shader> shader)
+        {
+            if (!shader)
+                return default;
+            return new Material(shader);
+        }
+        private static ObjectHandle<Shader> GetMaterialShader(ObjectHandle<Material> material) => material ? material.value.shader : default;
+        private static void SetMaterialShader(ObjectHandle<Material> material, ObjectHandle<Shader> shader)
+        {
+            if (material)
+                material.value.shader = shader;
+        }
+        private static int GetMaterialRenderQueue(ObjectHandle<Material> material) => material ? material.value.renderQueue : 0;
+        private static void SetMaterialRenderQueue(ObjectHandle<Material> material, int queue)
+        {
+            if (material)
+                material.value.renderQueue = queue;
+        }
+        private static float GetMaterialFloat(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetFloat(propertyId) : 0f;
+        private static void SetMaterialFloat(ObjectHandle<Material> material, int propertyId, float value)
+        {
+            if (material)
+                material.value.SetFloat(propertyId, value);
+        }
+        private static int GetMaterialInt(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetInt(propertyId) : 0;
+        private static void SetMaterialInt(ObjectHandle<Material> material, int propertyId, int value)
+        {
+            if (material)
+                material.value.SetInt(propertyId, value);
+        }
+        private static Vector4 GetMaterialVector(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetVector(propertyId) : default;
+        private static void SetMaterialVector(ObjectHandle<Material> material, int propertyId, Vector4 value)
+        {
+            if (material)
+                material.value.SetVector(propertyId, value);
+        }
+        private static Color GetMaterialColor(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetColor(propertyId) : default;
+        private static void SetMaterialColor(ObjectHandle<Material> material, int propertyId, Color color)
+        {
+            if (material)
+                material.value.SetColor(propertyId, color);
+        }
+        private static Matrix4x4 GetMaterialMatrix(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetMatrix(propertyId) : default;
+        private static void SetMaterialMatrix(ObjectHandle<Material> material, int propertyId, Matrix4x4 mat)
+        {
+            if (material)
+                material.value.SetMatrix(propertyId, mat);
+        }
+        private static ObjectHandle<Texture> GetMaterialTexture(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetTexture(propertyId) : default;
+        private static void SetMaterialTexture(ObjectHandle<Material> material, int propertyId, ObjectHandle<Texture> texture)
+        {
+            if (material)
+                material.value.SetTexture(propertyId, texture);
+        }
+        private static Vector2 GetMaterialTextureScale(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetTextureScale(propertyId) : default;
+        private static void SetMaterialTextureScale(ObjectHandle<Material> material, int propertyId, Vector2 scale)
+        {
+            if (material)
+                material.value.SetTextureScale(propertyId, scale);
+        }
+        private static Vector2 GetMaterialTextureOffset(ObjectHandle<Material> material, int propertyId) => material ? material.value.GetTextureOffset(propertyId) : default;
+        private static void SetMaterialTextureOffset(ObjectHandle<Material> material, int propertyId, Vector2 offset)
+        {
+            if (material)
+                material.value.SetTextureOffset(propertyId, offset);
+        }
+        private static bool HasMaterialProperty(ObjectHandle<Material> material, int propertyId) => material ? material.value.HasProperty(propertyId) : false;
+        private static void EnableMaterialKeyword(ObjectHandle<Material> material, String8 keyword)
+        {
+            if (material)
+                material.value.EnableKeyword(keyword.ToString());
+        }
+        private static void DisableMaterialKeyword(ObjectHandle<Material> material, String8 keyword)
+        {
+            if (material)
+                material.value.DisableKeyword(keyword.ToString());
+        }
+        private static bool IsMaterialKeywordEnabled(ObjectHandle<Material> material, String8 keyword) => material ? material.value.IsKeywordEnabled(keyword.ToString()) : false;
 
         // Texture API
 
@@ -412,14 +431,8 @@ namespace OdinInterop
 
         // Texture2D API
 
-        private static ObjectHandle<Texture2D> CreateTexture2D(int width, int height, TextureFormat format, bool mipChain)
-        {
-            return new Texture2D(width, height, format, mipChain);
-        }
-        private static ObjectHandle<Texture2D> CreateTexture2DWithMipCount(int width, int height, TextureFormat format, int mipCount, bool linear)
-        {
-            return new Texture2D(width, height, format, mipCount, linear);
-        }
+        private static ObjectHandle<Texture2D> CreateTexture2D(int width, int height, TextureFormat format = TextureFormat.RGBA32, bool mipChain = true, bool linear = false, bool createUninitialised = false) => new Texture2D(width, height, format, mipChain, linear, createUninitialised);
+        private static ObjectHandle<Texture2D> CreateTexture2DWithMipCount(int width, int height, TextureFormat format = TextureFormat.RGBA32, int mipCount = -1, bool linear = false) => new Texture2D(width, height, format, mipCount, linear);
         private static TextureFormat GetTexture2DFormat(ObjectHandle<Texture2D> texture) => texture ? texture.value.format : default;
         private static int GetTexture2DMipMapCount(ObjectHandle<Texture2D> texture) => texture ? texture.value.mipmapCount : 0;
         private static Color GetTexture2DPixel(ObjectHandle<Texture2D> texture, int x, int y, int mipLevel = 0) => texture ? texture.value.GetPixel(x, y, mipLevel) : default;
@@ -429,26 +442,7 @@ namespace OdinInterop
             if (texture)
                 texture.value.SetPixel(x, y, color, mipLevel);
         }
-        private static Slice<Color> GetTexture2DPixels(ObjectHandle<Texture2D> texture, int mipLevel, Allocator allocator)
-        {
-            if (!texture)
-                return default;
-            var pixels = texture.value.GetPixels(mipLevel);
-            var slice = new Slice<Color>(pixels.Length, allocator);
-            for (var i = 0; i < pixels.Length; i++)
-                slice.ptr[i] = pixels[i];
-            return slice;
-        }
-        private static void SetTexture2DPixels(ObjectHandle<Texture2D> texture, Slice<Color> pixels, int mipLevel = 0)
-        {
-            if (!texture)
-                return;
-            var arr = new Color[(int)pixels.len];
-            for (var i = 0; i < (int)pixels.len; i++)
-                arr[i] = pixels.ptr[i];
-            texture.value.SetPixels(arr, mipLevel);
-        }
-        private static Slice<Color32> GetTexture2DPixels32(ObjectHandle<Texture2D> texture, int mipLevel, Allocator allocator)
+        private static Slice<Color32> GetTexture2DPixels(ObjectHandle<Texture2D> texture, int mipLevel, Allocator allocator)
         {
             if (!texture)
                 return default;
@@ -458,7 +452,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DPixels32(ObjectHandle<Texture2D> texture, Slice<Color32> pixels, int mipLevel = 0)
+        private static void SetTexture2DPixels(ObjectHandle<Texture2D> texture, Slice<Color32> pixels, int mipLevel = 0)
         {
             if (!texture)
                 return;
@@ -477,8 +471,8 @@ namespace OdinInterop
             if (texture)
                 texture.value.ReadPixels(source, destX, destY, recalculateMipMaps);
         }
-        private static bool ResizeTexture2D(ObjectHandle<Texture2D> texture, int width, int height, TextureFormat format, bool hasMipMap) => texture ? texture.value.Reinitialize(width, height, format, hasMipMap) : false;
-        private static bool ResizeTexture2DSimple(ObjectHandle<Texture2D> texture, int width, int height) => texture ? texture.value.Reinitialize(width, height) : false;
+        private static bool ReinitializeTexture2D(ObjectHandle<Texture2D> texture, int width, int height) => texture ? texture.value.Reinitialize(width, height) : false;
+        private static bool ReinitializeTexture2DWithNewFormat(ObjectHandle<Texture2D> texture, int width, int height, TextureFormat format, bool hasMipMap) => texture ? texture.value.Reinitialize(width, height, format, hasMipMap) : false;
         private static void CompressTexture2D(ObjectHandle<Texture2D> texture, bool highQuality)
         {
             if (texture)
@@ -487,36 +481,11 @@ namespace OdinInterop
 
         // Texture2DArray API
 
-        private static ObjectHandle<Texture2DArray> CreateTexture2DArray(int width, int height, int depth, TextureFormat format, bool mipChain)
-        {
-            return new Texture2DArray(width, height, depth, format, mipChain);
-        }
-        private static ObjectHandle<Texture2DArray> CreateTexture2DArrayWithMipCount(int width, int height, int depth, TextureFormat format, int mipCount, bool linear)
-        {
-            return new Texture2DArray(width, height, depth, format, mipCount, linear);
-        }
+        private static ObjectHandle<Texture2DArray> CreateTexture2DArray(int width, int height, int depth, TextureFormat format, bool mipChain) => new Texture2DArray(width, height, depth, format, mipChain);
+        private static ObjectHandle<Texture2DArray> CreateTexture2DArrayWithMipCount(int width, int height, int depth, TextureFormat format, int mipCount, bool linear) => new Texture2DArray(width, height, depth, format, mipCount, linear);
         private static int GetTexture2DArrayDepth(ObjectHandle<Texture2DArray> textureArray) => textureArray ? textureArray.value.depth : 0;
         private static TextureFormat GetTexture2DArrayFormat(ObjectHandle<Texture2DArray> textureArray) => textureArray ? textureArray.value.format : default;
-        private static Slice<Color> GetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, int arrayElement, int mipLevel, Allocator allocator)
-        {
-            if (!textureArray)
-                return default;
-            var pixels = textureArray.value.GetPixels(arrayElement, mipLevel);
-            var slice = new Slice<Color>(pixels.Length, allocator);
-            for (var i = 0; i < pixels.Length; i++)
-                slice.ptr[i] = pixels[i];
-            return slice;
-        }
-        private static void SetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, Slice<Color> pixels, int arrayElement, int mipLevel = 0)
-        {
-            if (!textureArray)
-                return;
-            var arr = new Color[(int)pixels.len];
-            for (var i = 0; i < (int)pixels.len; i++)
-                arr[i] = pixels.ptr[i];
-            textureArray.value.SetPixels(arr, arrayElement, mipLevel);
-        }
-        private static Slice<Color32> GetTexture2DArrayPixels32(ObjectHandle<Texture2DArray> textureArray, int arrayElement, int mipLevel, Allocator allocator)
+        private static Slice<Color32> GetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, int arrayElement, int mipLevel, Allocator allocator)
         {
             if (!textureArray)
                 return default;
@@ -526,7 +495,7 @@ namespace OdinInterop
                 slice.ptr[i] = pixels[i];
             return slice;
         }
-        private static void SetTexture2DArrayPixels32(ObjectHandle<Texture2DArray> textureArray, Slice<Color32> pixels, int arrayElement, int mipLevel = 0)
+        private static void SetTexture2DArrayPixels(ObjectHandle<Texture2DArray> textureArray, Slice<Color32> pixels, int arrayElement, int mipLevel = 0)
         {
             if (!textureArray)
                 return;

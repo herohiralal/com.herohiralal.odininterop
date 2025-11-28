@@ -59,49 +59,49 @@ namespace OdinInterop
 
         private static bool Linecast(LayerMask layerMask, Vector3 start, Vector3 end, out RaycastHit hitInfo, QueryTriggerInteraction queryTriggerInteraction = default) =>
             Physics.Linecast(start, end, out hitInfo, layerMask, queryTriggerInteraction);
-        private static bool LinecastAll(LayerMask layerMask, Vector3 start, Vector3 end, out Slice<RaycastHit> hitInfos, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<RaycastHit> LinecastAll(LayerMask layerMask, Vector3 start, Vector3 end, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var hitCount = Physics.RaycastNonAlloc(new Ray(start, end - start), BindingsHelper.raycastHits, (end - start).magnitude, layerMask, queryTriggerInteraction);
-            hitInfos = new Slice<RaycastHit>(hitCount, allocator);
+            var hitInfos = new Slice<RaycastHit>(hitCount, allocator);
             for (var i = 0; i < hitCount; i++)
                 hitInfos.ptr[i] = BindingsHelper.raycastHits[i];
-            return hitCount > 0;
+            return hitInfos;
         }
 
         private static bool CapsuleCast(LayerMask layerMask, Vector3 point1, Vector3 point2, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default) =>
             Physics.CapsuleCast(point1, point2, radius, direction, out hitInfo, maxDistance, layerMask, queryTriggerInteraction);
 
-        private static bool CapsuleCastAll(LayerMask layerMask, Vector3 point1, Vector3 point2, float radius, Vector3 direction, out Slice<RaycastHit> hitInfos, Allocator allocator, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<RaycastHit> CapsuleCastAll(LayerMask layerMask, Vector3 point1, Vector3 point2, float radius, Vector3 direction, Allocator allocator, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var hitCount = Physics.CapsuleCastNonAlloc(point1, point2, radius, direction, BindingsHelper.raycastHits, maxDistance, layerMask, queryTriggerInteraction);
-            hitInfos = new Slice<RaycastHit>(hitCount, allocator);
+            var hitInfos = new Slice<RaycastHit>(hitCount, allocator);
             for (var i = 0; i < hitCount; i++)
                 hitInfos.ptr[i] = BindingsHelper.raycastHits[i];
-            return hitCount > 0;
+            return hitInfos;
         }
 
         private static bool SphereCast(LayerMask layerMask, Vector3 origin, float radius, Vector3 direction, out RaycastHit hitInfo, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default) =>
             Physics.SphereCast(origin, radius, direction, out hitInfo, maxDistance, layerMask, queryTriggerInteraction);
 
-        private static bool SphereCastAll(LayerMask layerMask, Vector3 origin, float radius, Vector3 direction, out Slice<RaycastHit> hitInfos, Allocator allocator, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<RaycastHit> SphereCastAll(LayerMask layerMask, Vector3 origin, float radius, Vector3 direction, Allocator allocator, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var hitCount = Physics.SphereCastNonAlloc(origin, radius, direction, BindingsHelper.raycastHits, maxDistance, layerMask, queryTriggerInteraction);
-            hitInfos = new Slice<RaycastHit>(hitCount, allocator);
+            var hitInfos = new Slice<RaycastHit>(hitCount, allocator);
             for (var i = 0; i < hitCount; i++)
                 hitInfos.ptr[i] = BindingsHelper.raycastHits[i];
-            return hitCount > 0;
+            return hitInfos;
         }
 
         private static bool BoxCast(LayerMask layerMask, Vector3 center, Vector3 halfExtents, Vector3 direction, out RaycastHit hitInfo, Quaternion orientation = default, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default) =>
             Physics.BoxCast(center, halfExtents, direction, out hitInfo, orientation, maxDistance, layerMask, queryTriggerInteraction);
 
-        private static bool BoxCastAll(LayerMask layerMask, Vector3 center, Vector3 halfExtents, Vector3 direction, out Slice<RaycastHit> hitInfos, Allocator allocator, Quaternion orientation = default, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<RaycastHit> BoxCastAll(LayerMask layerMask, Vector3 center, Vector3 halfExtents, Vector3 direction, Allocator allocator, Quaternion orientation = default, float maxDistance = float.MaxValue, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var hitCount = Physics.BoxCastNonAlloc(center, halfExtents, direction, BindingsHelper.raycastHits, orientation, maxDistance, layerMask, queryTriggerInteraction);
-            hitInfos = new Slice<RaycastHit>(hitCount, allocator);
+            var hitInfos = new Slice<RaycastHit>(hitCount, allocator);
             for (var i = 0; i < hitCount; i++)
                 hitInfos.ptr[i] = BindingsHelper.raycastHits[i];
-            return hitCount > 0;
+            return hitInfos;
         }
 
         private static bool CheckCapsule(LayerMask layerMask, Vector3 start, Vector3 end, float radius, QueryTriggerInteraction queryTriggerInteraction = default) =>
@@ -113,37 +113,37 @@ namespace OdinInterop
         private static bool CheckBox(LayerMask layerMask, Vector3 center, Vector3 halfExtents, Quaternion orientation = default, QueryTriggerInteraction queryTriggerInteraction = default) =>
             Physics.CheckBox(center, halfExtents, orientation, layerMask, queryTriggerInteraction);
 
-        private static bool OverlapCapsule(LayerMask layerMask, Vector3 point0, Vector3 point1, float radius, out Slice<ObjectHandle<Collider>> colliders, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<ObjectHandle<Collider>> OverlapCapsule(LayerMask layerMask, Vector3 point0, Vector3 point1, float radius, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var colliderCount = Physics.OverlapCapsuleNonAlloc(point0, point1, radius, BindingsHelper.colliders, layerMask, queryTriggerInteraction);
-            colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
+            var colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
             for (var i = 0; i < colliderCount; i++)
                 colliders.ptr[i] = BindingsHelper.colliders[i];
             for (var i = 0; i < colliderCount; i++)
                 BindingsHelper.colliders[i] = null; // null it out so gc doesn't keep old references
-            return colliderCount > 0;
+            return colliders;
         }
 
-        private static bool OverlapSphere(LayerMask layerMask, Vector3 position, float radius, out Slice<ObjectHandle<Collider>> colliders, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<ObjectHandle<Collider>> OverlapSphere(LayerMask layerMask, Vector3 position, float radius, Allocator allocator, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var colliderCount = Physics.OverlapSphereNonAlloc(position, radius, BindingsHelper.colliders, layerMask, queryTriggerInteraction);
-            colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
+            var colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
             for (var i = 0; i < colliderCount; i++)
                 colliders.ptr[i] = BindingsHelper.colliders[i];
             for (var i = 0; i < colliderCount; i++)
                 BindingsHelper.colliders[i] = null; // null it out so gc doesn't keep old references
-            return colliderCount > 0;
+            return colliders;
         }
 
-        private static bool OverlapBox(LayerMask layerMask, Vector3 center, Vector3 halfExtents, out Slice<ObjectHandle<Collider>> colliders, Allocator allocator, Quaternion orientation = default, QueryTriggerInteraction queryTriggerInteraction = default)
+        private static Slice<ObjectHandle<Collider>> OverlapBox(LayerMask layerMask, Vector3 center, Vector3 halfExtents, Allocator allocator, Quaternion orientation = default, QueryTriggerInteraction queryTriggerInteraction = default)
         {
             var colliderCount = Physics.OverlapBoxNonAlloc(center, halfExtents, BindingsHelper.colliders, orientation, layerMask, queryTriggerInteraction);
-            colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
+            var colliders = new Slice<ObjectHandle<Collider>>(colliderCount, allocator);
             for (var i = 0; i < colliderCount; i++)
                 colliders.ptr[i] = BindingsHelper.colliders[i];
             for (var i = 0; i < colliderCount; i++)
                 BindingsHelper.colliders[i] = null; // null it out so gc doesn't keep old references
-            return colliderCount > 0;
+            return colliders;
         }
 
         private static void BakeMesh(ObjectHandle<Mesh> mesh, bool convex)
