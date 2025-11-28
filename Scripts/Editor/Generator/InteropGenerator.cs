@@ -355,9 +355,38 @@ namespace OdinInterop.Editor
                             s_StrBld.Append(p.Name).Append(": ").AppendOdnTypeName(p.ParameterType);
                             if (p.HasDefaultValue)
                             {
+                                static bool HandleDefaultValue<T>(StringBuilder sb, ParameterInfo p)
+                                {
+                                    if (p.ParameterType != typeof(T))
+                                        return false;
+
+                                    var val = (T)p.DefaultValue;
+                                    sb.Append(" = ").Append(val.ToString().ToLowerInvariant());
+                                    return true;
+                                }
+
                                 if (p.ParameterType == typeof(Allocator))
                                 {
                                     s_StrBld.Append(" = context.allocator");
+                                }
+                                else if (false ||
+                                        HandleDefaultValue<bool>(s_StrBld, p) ||
+                                        HandleDefaultValue<byte>(s_StrBld, p) ||
+                                        HandleDefaultValue<sbyte>(s_StrBld, p) ||
+                                        HandleDefaultValue<ushort>(s_StrBld, p) ||
+                                        HandleDefaultValue<short>(s_StrBld, p) ||
+                                        HandleDefaultValue<int>(s_StrBld, p) ||
+                                        HandleDefaultValue<uint>(s_StrBld, p) ||
+                                        HandleDefaultValue<long>(s_StrBld, p) ||
+                                        HandleDefaultValue<ulong>(s_StrBld, p) ||
+                                        HandleDefaultValue<float>(s_StrBld, p) ||
+                                        HandleDefaultValue<double>(s_StrBld, p) ||
+                                        false)
+                                {
+                                }
+                                else if (p.ParameterType == typeof(Quaternion))
+                                {
+                                    s_StrBld.Append(" = quaternion128(1)");
                                 }
                                 else
                                 {
@@ -709,6 +738,10 @@ namespace OdinInterop.Editor
             else if (t == typeof(Color32))
             {
                 sb.Append("Color32");
+            }
+            else if (t == typeof(LayerMask))
+            {
+                sb.Append("GameObjectLayerMask");
             }
             else
             {
