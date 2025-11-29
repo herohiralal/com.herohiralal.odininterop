@@ -11,5 +11,7 @@ namespace OdinInterop
         internal static readonly List<Vector2> tempVector2List = new List<Vector2>(65536);
         internal static readonly List<Vector3> tempVector3List = new List<Vector3>(65536);
         internal static readonly List<int> tempIntList = new List<int>(65536);
+        internal static readonly List<AnimatorClipInfo> tempAnimatorClipInfoList = new List<AnimatorClipInfo>(256);
+        internal static readonly List<KeyValuePair<AnimationClip, AnimationClip>> tempAnimationClipPairList = new List<KeyValuePair<AnimationClip, AnimationClip>>(256);
     }
 }
