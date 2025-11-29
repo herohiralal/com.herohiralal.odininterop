@@ -123,8 +123,11 @@ namespace OdinInterop
         public void Dispose() => AsSlice().Dispose();
         public void Dispose(Allocator allocator) => AsSlice().Dispose(allocator);
 
-        public override string ToString()
+        public override readonly string ToString()
         {
+            if (ptr == null || len == IntPtr.Zero)
+                return string.Empty;
+
             return System.Text.Encoding.UTF8.GetString(ptr, (int)len);
         }
     }
