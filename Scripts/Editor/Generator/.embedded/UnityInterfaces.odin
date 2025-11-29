@@ -576,9 +576,9 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 	shortFilePath := loc.file_path[pathSizeToTrim:]
 
 	messageLen := len(text)
-	messageLen += len(" (from ")
+	messageLen += 1 // newline
 	messageLen += len(loc.procedure)
-	messageLen += len(" at ")
+	messageLen += len("() (at ")
 	messageLen += len(shortFilePath)
 	messageLen +=  /*colon*/1 +  /*line num*/7 +  /*colon*/1 +  /*column num*/7 +  /*closing paren*/1
 
@@ -599,9 +599,9 @@ OdnTrop_Internal_MainLogFunc :: proc(data: rawptr, level: runtime.Logger_Level, 
 
 			sb := strings.builder_from_bytes(transmute([]u8)slice)
 			strings.write_string(&sb, text)
-			strings.write_string(&sb, " (from ")
+			strings.write_rune(&sb, '\n')
 			strings.write_string(&sb, loc.procedure)
-			strings.write_string(&sb, " at ")
+			strings.write_string(&sb, "() (at ")
 			strings.write_string(&sb, shortFilePath)
 			strings.write_rune(&sb, ':')
 			strings.write_int(&sb, int(loc.line), 10)
