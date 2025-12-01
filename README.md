@@ -30,6 +30,27 @@ How to use at the most basic level:
   - [Odin Overview](https://odin-lang.org/docs/overview/)
 - `Ctrl`+`Alt`+`R` to recompile the Odin interop library.
 
+This works even if you're in Play Mode. The bindings will be assigned automatically.
+
+### Runtime Reloading
+
+Runtime reloading means reloading Odin code in a standalone build while the application is running.
+
+Currently, the only supported platform for this is Android ARM64. The rationale is - ARM64 is the most common Android architecture, it's not possible to do runtime reloading on iOS and just use the editor for desktop platforms (might add support for Windows/macOS/Linux later).
+
+To use Runtime Reloading:
+- Add `ODININTEROP_RUNTIME_RELOADING` scripting define.
+- Build and deploy to an Android device.
+  - This includes a build-time version of the Odin code inside the app package itself.
+  - If no hot-reloadable version is available, this will be used as a fallback.
+- Connect the device to your computer and enable ADB.
+- Select `Tools/Odin Interop/Push ARM64 Library to Android Device` menu item.
+  - This will push the latest compiled Odin library to the device.
+- The application will pick this up and reload the library automatically.
+  - ~1.5s delay is to be expected, because the polling for a new file happens every 1.5s.
+- Note that some kinds of reloading might require restarting the application.
+  - Still better than rebuilding the application though, obviously.
+
 ### Main Unity callbacks
 
 If you implement these functions, they will automatically be called from a `DontDestroyOnLoad` MonoBehaviour that gets created on startup (`BeforeSceneLoad` in `RuntimeInitializeOnLoadMethod` terms).
