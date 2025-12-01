@@ -44,7 +44,7 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_ANDROID_ARMv7_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH, "libOdinInterop.so");
         public static readonly string ODIN_ANDROID_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
         public static readonly string ODIN_ANDROID_X8664_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH, "libOdinInterop.so");
-        public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "AndroidRuntime");
+        public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_PLUGIN_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "AndroidRuntime");
         public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_RUNTIME_RELOAD_PLUGIN_DIR_PATH, "aarch64");
         public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
 
