@@ -446,6 +446,7 @@ namespace OdinInterop.Editor
 
             Directory.CreateDirectory(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH);
 
+            InteropGenerator.GenerateInteropCode();
             if (!CompileOdinInteropLibraryForAndroid(false, true))
             {
                 Debug.LogError("[OdinCompiler]: Failed to compile OdinInterop library for Android. Cannot push file to device.");
