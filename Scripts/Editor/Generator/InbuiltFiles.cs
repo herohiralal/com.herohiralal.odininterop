@@ -139,6 +139,42 @@ IsEnabled :: proc {
     IsRendererEnabled,
     IsColliderEnabled,
 }
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalAwake: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalAwakeDelegate : proc() {
+    when #defined(OnGlobalAwake) {
+        OnGlobalAwake()
+    }
+}
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalStart: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalStartDelegate : proc() {
+    when #defined(OnGlobalStart) {
+        OnGlobalStart()
+    }
+}
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalFixedUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalFixedUpdateDelegate : proc(dt: f32) {
+    when #defined(OnGlobalFixedUpdate) {
+        OnGlobalFixedUpdate(dt)
+    }
+}
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalUpdateDelegate : proc(dt, unscaledDt: f32) {
+    when #defined(OnGlobalUpdate) {
+        OnGlobalUpdate(dt, unscaledDt)
+    }
+}
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalLateUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalLateUpdateDelegate : proc(dt, unscaledDt: f32) {
+    when #defined(OnGlobalLateUpdate) {
+        OnGlobalLateUpdate(dt, unscaledDt)
+    }
+}
+
+OdinInterop_Internal_OdinInteropHookBindings_OnGlobalDestroy: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalDestroyDelegate : proc() {
+    when #defined(OnGlobalDestroy) {
+        OnGlobalDestroy()
+    }
+}
 ";
     }
 }
