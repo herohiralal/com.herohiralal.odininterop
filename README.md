@@ -63,7 +63,18 @@ OnGlobalUpdate :: proc(dt, unscaled: f32)
 OnGlobalLateUpdate :: proc(dt, unscaled: f32)
 OnGlobalDestroy :: proc()
 ```
-### Exposing more C# functions
+
+### Bindings Generation
+
+This section is all about how to write new bindings.
+
+#### Examples
+
+You can find a lot of examples of generated bindings inside this package.
+
+Check out [Components Bindings](./Scripts/Runtime/Bindings/EngineBindings.Component.cs) or [GameObject Bindings](./Scripts/Runtime/Bindings/EngineBindings.GameObject.cs) for examples of exposing Unity APIs to Odin.
+
+#### Exposing more C# functions
 
 Very straightforward, but also maybe unnecessary. The main package comes with batteries included.
 
@@ -104,7 +115,7 @@ some_proc :: proc() {
   - Allocators using `default` as the default value means `context.allocator` on Odin side.
   - Quaternions using `default` as the default value means `quaternion128(1)` (/Identity Quaternion) on Odin side.
 
-### Exposing Odin functions
+#### Exposing Odin functions
 
 Slightly more complex.
 
@@ -146,7 +157,7 @@ compiler error is raised at the line of declaration instead of at the line of us
 */
 ```
 
-### Supported Interop Types
+#### Supported Interop Types
 
 Because Odin uses C ABI for interoperability, only certain types are supported for interop.
 
