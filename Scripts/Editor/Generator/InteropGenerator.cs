@@ -20,6 +20,7 @@ namespace OdinInterop.Editor
         internal static void GenerateInteropCode()
         {
             s_ExportedTypes.Clear();
+            s_HandledTypes.Clear();
 
             // create a clean odn out dir
             {

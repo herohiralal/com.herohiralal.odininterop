@@ -1,4 +1,6 @@
 using System;
+using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace OdinInterop
 {
@@ -17,5 +19,14 @@ namespace OdinInterop
         }
 
         public static IntPtr libraryHandle { get; private set; } = IntPtr.Zero;
+
+#if !UNITY_EDITOR && ODININTEROP_RUNTIME_RELOADING
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void InitializeRuntime()
+        {
+            var go = new GameObject("[OdinInteropRuntimeReloader]", typeof(RuntimeReloader));
+            Object.DontDestroyOnLoad(go);
+        }
+#endif
     }
 }

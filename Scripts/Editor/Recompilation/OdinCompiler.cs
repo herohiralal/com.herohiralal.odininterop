@@ -421,7 +421,109 @@ namespace OdinInterop.Editor
             }
         }
 
-        internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease)
+        [MenuItem("Tools/Odin Interop/Push ARM64 Library to Android Device")]
+        private static void PushFileForAndroid() => PushFileForAndroidInternal();
+
+        private static bool PushFileForAndroidInternal()
+        {
+#if UNITY_ANDROID_API
+            var sdkPath = AndroidExternalToolsSettings.sdkRootPath;
+#else
+            var sdkPath = "";
+#endif
+
+            if (string.IsNullOrWhiteSpace(sdkPath))
+            {
+                Debug.LogError("[OdinCompiler]: Android SDK path could not be determined. Please ensure the Android Build Support module is installed via the Unity Hub.");
+                return false;
+            }
+
+            if (!CompileOdinInteropLibraryForAndroid(false, true))
+            {
+                Debug.LogError("[OdinCompiler]: Failed to compile OdinInterop library for Android. Cannot push file to device.");
+                return false;
+            }
+
+            var bundleId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
+
+            if (!File.Exists(ODIN_ANDROID_ARMv8_PLUGIN_PATH))
+            {
+                Debug.LogError($"[OdinCompiler]: Expected compiled Android library not found at path: {ODIN_ANDROID_ARMv8_PLUGIN_PATH}. Cannot push file to device.");
+                return false;
+            }
+
+            var adbPath = Path.Combine(sdkPath, "platform-tools", "adb");
+            var copyToTmp = RunProcess(
+                "Odin Android ADB Push to /data/local/tmp",
+                adbPath,
+                new List<string>
+                {
+                    "push",
+                    ODIN_ANDROID_ARMv8_PLUGIN_PATH,
+                    "/data/local/tmp/libOdinInterop.so"
+                },
+                null,
+                ODIN_LIB_INPUT_PATH,
+                null
+            );
+
+
+            if (!copyToTmp)
+            {
+                Debug.LogError($"[OdinCompiler]: Failed to push {ODIN_ANDROID_ARMv8_PLUGIN_PATH} to Android device /data/local/tmp. Ensure device is connected and adb is authorized.");
+                return false;
+            }
+
+            var mkHotLibDir = RunProcess(
+                "Odin Android ADB Make app hot lib dir",
+                adbPath,
+                new List<string>
+                {
+                    "shell",
+                    "run-as",
+                    bundleId,
+                    "mkdir",
+                    "-p",
+                    "files/hotlibs"
+                },
+                null,
+                ODIN_LIB_INPUT_PATH,
+                null
+            );
+
+            if (!mkHotLibDir)
+            {
+                Debug.LogError($"[OdinCompiler]: Failed to create hotlib directory on Android device for app {bundleId}.");
+                return false;
+            }
+
+            var copyToHotLibDir = RunProcess(
+                "Odin Android ADB Move to app hot lib dir",
+                adbPath,
+                new List<string>
+                {
+                    "shell",
+                    "run-as",
+                    bundleId,
+                    "cp",
+                    "/data/local/tmp/libOdinInterop.so",
+                    $"files/hotlibs/libOdinInterop_{DateTime.Now:yyyyMMddHHmmss}.so"
+                },
+                null,
+                ODIN_LIB_INPUT_PATH,
+                null
+            );
+
+            if (!copyToHotLibDir)
+            {
+                Debug.LogError($"[OdinCompiler]: Failed to move cool.txt to hotlib directory on Android device for app {bundleId}.");
+                return false;
+            }
+
+            return true;
+        }
+
+        internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease, bool arm64Only)
         {
             if (!Directory.Exists(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH))
                 Directory.CreateDirectory(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH);
@@ -452,9 +554,9 @@ namespace OdinInterop.Editor
                 throw new BuildFailedException("Android NDK path could not be determined. Please ensure the Android Build Support module is installed via the Unity Hub.");
 
             var archs = PlayerSettings.Android.targetArchitectures;
-            return (!archs.HasFlag(AndroidArchitecture.ARMv7) || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath)) &&
-                   (!archs.HasFlag(AndroidArchitecture.ARM64) || CompileForArch(AndroidArchitecture.ARM64, isRelease, ndkPath)) &&
-                   (!archs.HasFlag(AndroidArchitecture.X86_64) || CompileForArch(AndroidArchitecture.X86_64, isRelease, ndkPath));
+            return (!archs.HasFlag(AndroidArchitecture.ARMv7) || arm64Only || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath)) &&
+                   (!(archs.HasFlag(AndroidArchitecture.ARM64) || arm64Only) || CompileForArch(AndroidArchitecture.ARM64, isRelease, ndkPath)) &&
+                   (!archs.HasFlag(AndroidArchitecture.X86_64) || arm64Only || CompileForArch(AndroidArchitecture.X86_64, isRelease, ndkPath));
 
             static bool CompileForArch(AndroidArchitecture arch, bool isRelease, string ndkPath)
             {
@@ -752,7 +854,7 @@ namespace OdinInterop.Editor
             CompileOdinInteropLibraryForWindows(isRelease: false);
 #endif
             CompileOdinInteropLibraryForLinux(isRelease: false);
-            CompileOdinInteropLibraryForAndroid(isRelease: false);
+            CompileOdinInteropLibraryForAndroid(isRelease: false, arm64Only: false);
 #if UNITY_EDITOR_OSX
             CompileOdinInteropLibraryForMacOS(isRelease: false);
             CompileOdinInteropLibraryForIOS(isRelease: false);
@@ -766,7 +868,7 @@ namespace OdinInterop.Editor
             CompileOdinInteropLibraryForWindows(isRelease: true);
 #endif
             CompileOdinInteropLibraryForLinux(isRelease: true);
-            CompileOdinInteropLibraryForAndroid(isRelease: true);
+            CompileOdinInteropLibraryForAndroid(isRelease: true, arm64Only: false);
 #if UNITY_EDITOR_OSX
             CompileOdinInteropLibraryForMacOS(isRelease: true);
             CompileOdinInteropLibraryForIOS(isRelease: true);
@@ -828,7 +930,7 @@ namespace OdinInterop.Editor
             }
             else if (report.summary.platform == BuildTarget.Android)
             {
-                if (!OdinCompiler.CompileOdinInteropLibraryForAndroid(isRelease))
+                if (!OdinCompiler.CompileOdinInteropLibraryForAndroid(isRelease, false))
                 {
                     throw new BuildFailedException("Failed to compile OdinInterop library for Android build.");
                 }

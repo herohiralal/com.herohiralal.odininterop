@@ -268,7 +268,7 @@ namespace OdinInterop.SourceGenerator
             }
 
             // editor-specific code (hot-reload style)
-            sb.AppendLine("#if UNITY_EDITOR");
+            sb.AppendLine("#if UNITY_EDITOR || ODININTEROP_RUNTIME_RELOADING");
             sb.AppendLine();
 
             // global var for delegate
@@ -284,7 +284,11 @@ namespace OdinInterop.SourceGenerator
             }
 
             // editor initialization
+            sb.AppendLine("#if UNITY_EDITOR");
             sb.AppendIndent(sbIndent).AppendLine("[InitializeOnLoadMethod]");
+            sb.AppendLine("#else");
+            sb.AppendIndent(sbIndent).AppendLine("[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]");
+            sb.AppendLine("#endif");
             sb.AppendIndent(sbIndent).AppendLine("private static void odntrop_EditorInit()");
             sb.AppendIndent(sbIndent).AppendLine("{");
             sbIndent++;
@@ -415,7 +419,7 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent).AppendLine("{");
                 sbIndent++;
 
-                sb.AppendLine("#if UNITY_EDITOR");
+                sb.AppendLine("#if UNITY_EDITOR || ODININTEROP_RUNTIME_RELOADING");
                 sb.AppendIndent(sbIndent)
                     .Append("if (odntrop_delref_")
                     .Append(method.Name)

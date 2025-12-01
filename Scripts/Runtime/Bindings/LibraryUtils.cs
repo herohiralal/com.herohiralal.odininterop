@@ -1,4 +1,3 @@
-#if UNITY_EDITOR || UNITY_STANDALONE
 using System;
 using System.Runtime.InteropServices;
 
@@ -6,8 +5,9 @@ namespace OdinInterop
 {
     public static class LibraryUtils
     {
-#if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX))
-
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_LINUX || (!UNITY_EDITOR && (UNITY_STANDALONE_OSX || UNITY_STANDALONE_LINUX || UNITY_ANDROID))
+        private const int RTLD_LOCAL = 0x0;
+        private const int RTLD_NOW = 0x2;
         private const int RTLD_NOLOAD = 0x4;
 
         [DllImport("__Internal")]
@@ -19,7 +19,13 @@ namespace OdinInterop
         [DllImport("__Internal")]
         private static extern int dlclose(IntPtr handle);
 
-        public static IntPtr OpenLibrary(string path) => dlopen(path, 0);
+        public static IntPtr OpenLibrary(string path) => dlopen(path,
+#if !UNITY_EDITOR && UNITY_ANDROID
+            RTLD_LOCAL | RTLD_NOW
+#else
+            0
+#endif
+        );
 
         public static void CloseLibrary(IntPtr libraryHandle) => dlclose(libraryHandle);
 
@@ -78,4 +84,3 @@ namespace OdinInterop
 #endif
     }
 }
-#endif
