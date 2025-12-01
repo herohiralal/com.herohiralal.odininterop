@@ -74,6 +74,8 @@ You can find a lot of examples of generated bindings inside this package.
 
 Check out [Components Bindings](./Scripts/Runtime/Bindings/EngineBindings.Component.cs) or [GameObject Bindings](./Scripts/Runtime/Bindings/EngineBindings.GameObject.cs) for examples of exposing Unity APIs to Odin.
 
+Alternatively, check out [OdinInteropHook Bindings](./Scripts/Runtime/Bindings/OdinInteropHook.cs) for examples of exposing Odin functions to C#.
+
 #### Exposing more C# functions
 
 Very straightforward, but also maybe unnecessary. The main package comes with batteries included.
