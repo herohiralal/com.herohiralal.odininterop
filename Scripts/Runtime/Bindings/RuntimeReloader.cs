@@ -56,14 +56,12 @@ namespace OdinInterop
             if (unsupported)
                 throw new Exception("Runtime reloading is not supported in this build configuration!");
 
-            string path;
-            ulong timeStamp;
+            string path = "";
+            ulong timeStamp = 0;
             if (Application.platform == RuntimePlatform.Android)
                 path = FindLatestLibraryForAndroid(out timeStamp);
-            else
-                throw new Exception("Not a hot-reloadable platform!"); // UNSUPPORTED PLATFORM
 
-            if (currentTimeStamp >= timeStamp)
+            if (currentTimeStamp >= timeStamp && currentPath != "") // newer current timestamp and valid current path
                 return; // no change
 
             if (OdinCompilerUtils.libraryHandle != IntPtr.Zero)
@@ -83,6 +81,9 @@ namespace OdinInterop
                 }
                 catch { }
             }
+
+            if (string.IsNullOrWhiteSpace(path))
+                path = "OdinInterop";
 
             currentPath = path;
             currentTimeStamp = timeStamp;
