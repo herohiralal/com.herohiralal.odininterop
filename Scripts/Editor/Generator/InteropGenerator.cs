@@ -361,7 +361,13 @@ namespace OdinInterop.Editor
                                         return false;
 
                                     var val = (T)p.DefaultValue;
-                                    sb.Append(" = ").Append(val.ToString().ToLowerInvariant());
+                                    var str = val.ToString().ToLowerInvariant();
+                                    if (str == "-infinity")
+                                        str = "f32(0hFF80_0000)";
+                                    else if (str == "infinity" || str == "+infinity")
+                                        str = "f32(0h7F80_0000)";
+
+                                    sb.Append(" = ").Append(str);
                                     return true;
                                 }
 
@@ -588,10 +594,12 @@ namespace OdinInterop.Editor
                 resolvedName = resolvedName["UnityEngine_SceneManagement_".Length..];
             else if (resolvedName.StartsWith("UnityEngine_Audio_"))
                 resolvedName = resolvedName["UnityEngine_Audio_".Length..];
-            else if (resolvedName.StartsWith("UnityEngine_UI_"))
-                resolvedName = resolvedName["UnityEngine_UI_".Length..];
+            else if (resolvedName.StartsWith("UnityEngine_Playables_"))
+                resolvedName = resolvedName["UnityEngine_Playables_".Length..];
             else if (resolvedName.StartsWith("UnityEngine_Rendering_"))
                 resolvedName = resolvedName["UnityEngine_Rendering_".Length..];
+            else if (resolvedName.StartsWith("UnityEngine_UI_"))
+                resolvedName = resolvedName["UnityEngine_UI_".Length..];
             else if (resolvedName.StartsWith("UnityEngine_"))
                 resolvedName = resolvedName["UnityEngine_".Length..];
             else if (resolvedName.StartsWith("UnityEditor_"))
