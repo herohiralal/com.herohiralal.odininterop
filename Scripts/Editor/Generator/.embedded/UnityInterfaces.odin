@@ -297,6 +297,8 @@ CachedState :: struct {
 	heapAllocator: ^UnityAllocator,
 }
 
+ODNTROP_INTERNAL_RUNTIME_RELOADING :: #config(ODNTROP_INTERNAL_RUNTIME_RELOADING, false)
+
 when UNITY_EDITOR {
 
 	// KEEP IN SYNC WITH `StoredState` IN `Binder.c` AND `OdinCompiler.cs`!!!!!
@@ -327,7 +329,7 @@ when UNITY_EDITOR {
 		}
 	}
 } else {
-	when UNITY_STANDALONE_WIN {
+	when UNITY_STANDALONE_WIN && !ODNTROP_INTERNAL_RUNTIME_RELOADING {
 		@(export)
 		@(private = "file")
 		UnityPluginLoad :: proc "std" (ptr: ^IUnityInterfaces) {
@@ -358,6 +360,11 @@ when UNITY_EDITOR {
 			G_GlobalState = {}
 		}
 	}
+
+	@(export) // if ever need to export the interfaces
+	UnityOdnTropInternalGetUnityInterfaces :: proc "c" () -> rawptr {
+		return G_GlobalState.interfaces
+	}
 }
 
 @(private = "file")
@@ -375,10 +382,20 @@ UnityOdnTropInternalStaticInitialise :: proc "contextless" () {
 	G_GlobalState.memoryManager = GetInterface(IUnityMemoryManager, IUnityMemoryManagerGUID)
 }
 
-UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
-	G_GlobalState.cached.heapAllocator = G_GlobalState.memoryManager.CreateAllocator("OdinInterop", "HeapAllocator")
+when ODNTROP_INTERNAL_RUNTIME_RELOADING {
+	@(private = "file")
+	MAIN_ALLOCATOR_NAME_STR :: "HeapAllocator_Dynamic"
+} else {
+	@(private = "file")
+	MAIN_ALLOCATOR_NAME_STR :: "HeapAllocator"
 }
 
+@(private = "file")
+UnityOdnTropInternalInitialiseCachedState :: proc "contextless" () {
+	G_GlobalState.cached.heapAllocator = G_GlobalState.memoryManager.CreateAllocator("OdinInterop", MAIN_ALLOCATOR_NAME_STR)
+}
+
+@(private = "file")
 UnityOdnTropInternalShutdownCachedState :: proc "contextless" () {
 	G_GlobalState.memoryManager.DestroyAllocator(G_GlobalState.cached.heapAllocator)
 }

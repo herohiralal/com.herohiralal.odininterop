@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.IO;
 using System;
+using System.Runtime.InteropServices;
 
 namespace OdinInterop
 {
@@ -8,6 +9,7 @@ namespace OdinInterop
     [DefaultExecutionOrder(int.MaxValue)] // ensure this runs last
     public class RuntimeReloader : MonoBehaviour
     {
+
         [SerializeField] private string currentPath = "";
         [SerializeField] private ulong currentTimeStamp = 0;
 
@@ -25,8 +27,35 @@ namespace OdinInterop
             }
         }
 
+#if !UNITY_EDITOR && ODININTEROP_RUNTIME_RELOADING
+
+        private const string k_OdinInteropDllName =
+#if UNITY_IOS
+			"__Internal";
+#else
+            "OdinInterop";
+#endif
+
+        [DllImport(k_OdinInteropDllName, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UnityOdnTropInternalGetUnityInterfaces")]
+        private static extern IntPtr GetUnityInterfaces();
+#else
+        private static IntPtr GetUnityInterfaces() => IntPtr.Zero;
+#endif
+
+        private delegate void UnityPluginLoadDelegate(IntPtr unityInterfaces);
+        private delegate void UnityPluginUnloadDelegate();
+
         private void HotReload()
         {
+#if !UNITY_EDITOR && ODININTEROP_RUNTIME_RELOADING
+            var unsupported = false;
+#else
+            var unsupported = true;
+#endif
+
+            if (unsupported)
+                throw new Exception("Runtime reloading is not supported in this build configuration!");
+
             string path;
             ulong timeStamp;
             if (Application.platform == RuntimePlatform.Android)
@@ -39,6 +68,7 @@ namespace OdinInterop
 
             if (OdinCompilerUtils.libraryHandle != IntPtr.Zero)
             {
+                LibraryUtils.GetDelegate<UnityPluginUnloadDelegate>(OdinCompilerUtils.libraryHandle, "UnityPluginUnload")?.Invoke();
                 LibraryUtils.CloseLibrary(OdinCompilerUtils.libraryHandle);
                 OdinCompilerUtils.RaiseHotReloadEvt(IntPtr.Zero);
 
@@ -64,6 +94,7 @@ namespace OdinInterop
                 return;
             }
 
+            LibraryUtils.GetDelegate<UnityPluginLoadDelegate>(libraryHandle, "UnityPluginLoad")?.Invoke(GetUnityInterfaces());
             OdinCompilerUtils.RaiseHotReloadEvt(libraryHandle);
             Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "Hot-reloaded lib: {0}", path);
         }

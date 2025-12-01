@@ -44,6 +44,9 @@ namespace OdinInterop.Editor
         public static readonly string ODIN_ANDROID_ARMv7_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH, "libOdinInterop.so");
         public static readonly string ODIN_ANDROID_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
         public static readonly string ODIN_ANDROID_X8664_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_X8664_PLUGIN_DIR_PATH, "libOdinInterop.so");
+        public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_PLUGIN_DIR_PATH, "AndroidRuntime");
+        public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH = Path.Combine(ODIN_ANDROID_RUNTIME_RELOAD_PLUGIN_DIR_PATH, "aarch64");
+        public static readonly string ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH = Path.Combine(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH, "libOdinInterop.so");
 
         // linux
         public static readonly string ODIN_LINUX_OBJ_TEMP_DIR_PATH = Path.Combine(ODIN_LIB_OUTPUT_DIR_PATH, "Linux");
@@ -438,6 +441,11 @@ namespace OdinInterop.Editor
                 return false;
             }
 
+            if (Directory.Exists(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH))
+                Directory.Delete(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH, true);
+
+            Directory.CreateDirectory(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_DIR_PATH);
+
             if (!CompileOdinInteropLibraryForAndroid(false, true))
             {
                 Debug.LogError("[OdinCompiler]: Failed to compile OdinInterop library for Android. Cannot push file to device.");
@@ -446,9 +454,9 @@ namespace OdinInterop.Editor
 
             var bundleId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
 
-            if (!File.Exists(ODIN_ANDROID_ARMv8_PLUGIN_PATH))
+            if (!File.Exists(ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH))
             {
-                Debug.LogError($"[OdinCompiler]: Expected compiled Android library not found at path: {ODIN_ANDROID_ARMv8_PLUGIN_PATH}. Cannot push file to device.");
+                Debug.LogError($"[OdinCompiler]: Expected compiled Android library not found at path: {ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH}. Cannot push file to device.");
                 return false;
             }
 
@@ -459,7 +467,7 @@ namespace OdinInterop.Editor
                 new List<string>
                 {
                     "push",
-                    ODIN_ANDROID_ARMv8_PLUGIN_PATH,
+                    ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH,
                     "/data/local/tmp/libOdinInterop.so"
                 },
                 null,
@@ -470,7 +478,7 @@ namespace OdinInterop.Editor
 
             if (!copyToTmp)
             {
-                Debug.LogError($"[OdinCompiler]: Failed to push {ODIN_ANDROID_ARMv8_PLUGIN_PATH} to Android device /data/local/tmp. Ensure device is connected and adb is authorized.");
+                Debug.LogError($"[OdinCompiler]: Failed to push {ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH} to Android device /data/local/tmp. Ensure device is connected and adb is authorized.");
                 return false;
             }
 
@@ -523,7 +531,7 @@ namespace OdinInterop.Editor
             return true;
         }
 
-        internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease, bool arm64Only)
+        internal static bool CompileOdinInteropLibraryForAndroid(bool isRelease, bool forRuntimeReloading)
         {
             if (!Directory.Exists(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH))
                 Directory.CreateDirectory(ODIN_ANDROID_ARMv7_PLUGIN_DIR_PATH);
@@ -554,11 +562,11 @@ namespace OdinInterop.Editor
                 throw new BuildFailedException("Android NDK path could not be determined. Please ensure the Android Build Support module is installed via the Unity Hub.");
 
             var archs = PlayerSettings.Android.targetArchitectures;
-            return (!archs.HasFlag(AndroidArchitecture.ARMv7) || arm64Only || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath)) &&
-                   (!(archs.HasFlag(AndroidArchitecture.ARM64) || arm64Only) || CompileForArch(AndroidArchitecture.ARM64, isRelease, ndkPath)) &&
-                   (!archs.HasFlag(AndroidArchitecture.X86_64) || arm64Only || CompileForArch(AndroidArchitecture.X86_64, isRelease, ndkPath));
+            return (!archs.HasFlag(AndroidArchitecture.ARMv7) || forRuntimeReloading || CompileForArch(AndroidArchitecture.ARMv7, isRelease, ndkPath, false)) &&
+                   (!(archs.HasFlag(AndroidArchitecture.ARM64) || forRuntimeReloading) || CompileForArch(AndroidArchitecture.ARM64, isRelease, ndkPath, forRuntimeReloading)) &&
+                   (!archs.HasFlag(AndroidArchitecture.X86_64) || forRuntimeReloading || CompileForArch(AndroidArchitecture.X86_64, isRelease, ndkPath, false));
 
-            static bool CompileForArch(AndroidArchitecture arch, bool isRelease, string ndkPath)
+            static bool CompileForArch(AndroidArchitecture arch, bool isRelease, string ndkPath, bool forRuntimeReloading)
             {
                 string objPath, outPath, androidNdkPathThing, odnPlatform;
                 switch (arch)
@@ -571,7 +579,7 @@ namespace OdinInterop.Editor
                         break;
                     case AndroidArchitecture.ARM64:
                         objPath = ODIN_ANDROID_ARMv8_OBJ_PATH;
-                        outPath = ODIN_ANDROID_ARMv8_PLUGIN_PATH;
+                        outPath = forRuntimeReloading ? ODIN_ANDROID_RUNTIME_RELOAD_ARMv8_PLUGIN_PATH : ODIN_ANDROID_ARMv8_PLUGIN_PATH;
                         androidNdkPathThing = "aarch64";
                         odnPlatform = "linux_arm64";
                         break;
@@ -593,6 +601,11 @@ namespace OdinInterop.Editor
                     "-build-mode:object",
                     "-define:UNITY_ANDROID=true",
                 };
+
+                if (forRuntimeReloading)
+                {
+                    l.Add("-define:ODNTROP_INTERNAL_RUNTIME_RELOADING=true");
+                }
 
                 var d = new Dictionary<string, string>
                 {
@@ -854,7 +867,7 @@ namespace OdinInterop.Editor
             CompileOdinInteropLibraryForWindows(isRelease: false);
 #endif
             CompileOdinInteropLibraryForLinux(isRelease: false);
-            CompileOdinInteropLibraryForAndroid(isRelease: false, arm64Only: false);
+            CompileOdinInteropLibraryForAndroid(isRelease: false, forRuntimeReloading: false);
 #if UNITY_EDITOR_OSX
             CompileOdinInteropLibraryForMacOS(isRelease: false);
             CompileOdinInteropLibraryForIOS(isRelease: false);
@@ -868,7 +881,7 @@ namespace OdinInterop.Editor
             CompileOdinInteropLibraryForWindows(isRelease: true);
 #endif
             CompileOdinInteropLibraryForLinux(isRelease: true);
-            CompileOdinInteropLibraryForAndroid(isRelease: true, arm64Only: false);
+            CompileOdinInteropLibraryForAndroid(isRelease: true, forRuntimeReloading: false);
 #if UNITY_EDITOR_OSX
             CompileOdinInteropLibraryForMacOS(isRelease: true);
             CompileOdinInteropLibraryForIOS(isRelease: true);
