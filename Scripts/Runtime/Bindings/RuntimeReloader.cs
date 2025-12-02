@@ -20,12 +20,19 @@ namespace OdinInterop
         private void LateUpdate()
         {
             timer += Time.unscaledDeltaTime;
-            if (timer >= 1f) // 1s intervals
+            if (timer >= 1.5f) // 1.5s intervals
             {
                 timer = 0f;
                 HotReload();
             }
         }
+
+        private const string k_FallbackLibraryName =
+#if UNITY_ANDROID
+            "libOdinInterop.so";
+#else
+            "Unknown";
+#endif
 
 #if !UNITY_EDITOR && ODININTEROP_RUNTIME_RELOADING
 
@@ -66,13 +73,20 @@ namespace OdinInterop
 
             if (OdinCompilerUtils.libraryHandle != IntPtr.Zero)
             {
-                LibraryUtils.GetDelegate<UnityPluginUnloadDelegate>(OdinCompilerUtils.libraryHandle, "UnityPluginUnload")?.Invoke();
-                LibraryUtils.CloseLibrary(OdinCompilerUtils.libraryHandle);
+                var currentPathIsFallback = currentPath == k_FallbackLibraryName;
+
+                if (!currentPathIsFallback)
+                {
+                    // do not trigger unload callback for the fallback library
+                    LibraryUtils.GetDelegate<UnityPluginUnloadDelegate>(OdinCompilerUtils.libraryHandle, "UnityPluginUnload")?.Invoke();
+                    LibraryUtils.CloseLibrary(OdinCompilerUtils.libraryHandle);
+                }
+
                 OdinCompilerUtils.RaiseHotReloadEvt(IntPtr.Zero);
 
                 try
                 {
-                    if (File.Exists(currentPath))
+                    if (File.Exists(currentPath) && !currentPathIsFallback) // delete if not fallback lib
                     {
                         currentPath = "";
                         File.Delete(currentPath);
@@ -81,9 +95,6 @@ namespace OdinInterop
                 }
                 catch { }
             }
-
-            if (string.IsNullOrWhiteSpace(path))
-                path = "OdinInterop";
 
             currentPath = path;
             currentTimeStamp = timeStamp;
@@ -105,13 +116,13 @@ namespace OdinInterop
             best = 0;
             var searchDir = "/data/data/" + Application.identifier + "/files/hotlibs/";
             if (!Directory.Exists(searchDir))
-                return null;
+                return k_FallbackLibraryName;
 
             var files = Directory.GetFiles(searchDir, "libOdinInterop_*.so");
             if (files.Length == 0)
-                return null;
+                return k_FallbackLibraryName;
 
-            string latest = null;
+            string latest = k_FallbackLibraryName;
 
             foreach (var f in files)
             {
@@ -123,7 +134,7 @@ namespace OdinInterop
                     // delete the previous file
                     try
                     {
-                        if (!string.IsNullOrWhiteSpace(latest))
+                        if (!string.IsNullOrWhiteSpace(latest) && latest != k_FallbackLibraryName)
                         {
                             File.Delete(latest);
                             Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "Deleted: {0}", latest);
