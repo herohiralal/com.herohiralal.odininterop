@@ -7,94 +7,6 @@ Here's a short pitch:
 - Making a mobile game? This lets you recompile your game logic _on a device while the the game is running_.
 - Making a PC game? This lets you recompile your game logic _in the editor while in Play Mode_.
 
-## Motivation
-
-### Problems
-
-Having worked on a large project in Unity, my personal experience has been less than stellar.
-
-- Garbage Collection does not meaningfully protect your code against memory leaks.
-  - Forgot to `.Clear()` a static `List<T>`/`Dictionary<K, V>`? Leaked memory.
-  - Forgot to set a static reference to `null`? Leaked memory.
-  - If your game requires a bunch of scene transitions, you might end up incrementally leaking memory every time.
-  - The way Unity's `Resources.UnloadUnusedAssets()` works, it checks for static variables as well.
-    - So, you might end up leaking assets as well.
-    - If this comes from AssetBundles/Addressables, you're in a world of pain because of how it internally works.
-  - The way 'memory usage' works on mobile devices is that the OS will kill your app if it uses too much memory.
-    - HOWEVER, everything will be fine until you hit this level of tech debt.
-    - So you might end up going months until you must fix the problem.
-  - The bad news is, this is already too late a point to realistically fix your issues.
-- Garbage Collection causes huge frame-rate spikes.
-  - Almost all of C#'s standard library code is written without these considerations in mind.
-  - Because of the way gameplay code, lazy-inits, lazy-loads, etc. work, this is statistically likelier to happen at the worst possible moments.
-    - This leads to janky gameplay experiences.
-  - You can try to mitigate this by using object-pools, avoiding allocations, etc., but if you're going that far, how is a managed language _really_ helping you?
-- C# compile times and domain reloads are horrific.
-  - And it only gets worse as the project grows larger.
-  - Domain reloads are particularly painful because you can't reload code while in Play Mode.
-    - This kills iteration times.
-  - To 'recompile', you must go through: (stop play mode: 15-20s) -> (recompile + domain reload: 60-180s) -> (start play mode, which will reload the domain: 60-180s) -> (initialisation code executes: 5-10s) -> (reach desired state: 5-10s).
-    - This easily adds up to multiple minutes of waiting time for every small code change.
-- C# language features make it really easy to create a mess.
-  - Implicit casts, boxing/unboxing, inheritance hell; it's all a mess and needs to go.
-  - Even if your coding standards mandate not using these things, it's really easy for new team members, juniors or outsourced contractors to accidentally introduce these issues.
-
-### A New Dawn
-
-So, that brings up to the question - what could be the alternative. Ideally, we'd want a solution that:
-
-- Compiles fast. Reloads fast. Lets you iterate fast.
-- Allows for manual memory management techniques (Arenas, Pools, etc.).
-- Has modern language features without unnecessary complexity.
-- Easy interoperability with C# and Unity APIs.
-- Allows faster iterations by recompiling during Play Mode, and in a build.
-
-**And all of that, is what this package provides.** No other nonsense.
-
-### Why Odin?
-
-Let's look at some alternatives.
-
-#### (Insert Any Interpreted Language Here)
-
-- Does not work on AOT platforms like iOS or consoles.
-- Unity C# only works because of IL2CPP.
-
-#### Jai
-
-- Is in closed beta. Can't rely on everyone having access to the compiler.
-- At some point, might add support for Jai interop as well.
-
-#### C/C++
-
-- In C++, it's easy to shoot yourself in the foot with unnecessary abstractions. Arguably worse than C#.
-  - C has the opposite problem. It has initialiser lists, but that's about the only important thing it has.
-- Compile times are horrible. Even with precompiled headers and unity builds, it's still not great.
-  - C is a bit better in this regard, but still not ideal.
-- Setting up cross-compilation across different platforms is a nightmare.
-- Macros are too unhygienic and lead to unreadable code.
-- Requires too much work into creating platform-specific wrappers for standard library functions.
-  - C is even worse in this regard, because Windows straight up does not support a lot of stuff.
-
-#### Rust
-
-- Steep learning curve.
-- Borrow-checker leads to a lot of friction during development.
-- Compile times are horrible. Even with incremental compilation, it's still not great.
-- No reliability of imported packages working on your target platforms.
-  - Too much volatility due to the package manager being integrated into the build system.
-
-#### And Finally
-
-This is where we come to Odin, which is a perfect middle-ground from all of the above.
-
-- Great compilation times. Even large projects build very fast.
-- Modern language features without unnecessary complexity.
-- Easy interoperability with any language that supports C ABI (C#, C/C++, etc.).
-- Great, and extremely readable standard library.
-- Simple toolchain that is easy to set up across different platforms.
-- It works. The existence of this package is the proof.
-
 ## How To Use
 
 ### Basic usage
@@ -268,6 +180,94 @@ Here are the supported types:
   - `OdinInterop.Allocator` <-> `runtime.Allocator` (Odin memory allocator; useful for creating unmanaged Odin strings/collections in C#)
 - Unity Objects:
   - `T` <-> `OdinInterop.ObjectHandle<T>` (unmanaged wrapper handle; auto-converting from C# Objects; all classes deriving from `UnityEngine.Object` are supported)
+
+## Motivation
+
+### Problems
+
+Having worked on a large project in Unity, my personal experience has been less than stellar.
+
+- Garbage Collection does not meaningfully protect your code against memory leaks.
+  - Forgot to `.Clear()` a static `List<T>`/`Dictionary<K, V>`? Leaked memory.
+  - Forgot to set a static reference to `null`? Leaked memory.
+  - If your game requires a bunch of scene transitions, you might end up incrementally leaking memory every time.
+  - The way Unity's `Resources.UnloadUnusedAssets()` works, it checks for static variables as well.
+    - So, you might end up leaking assets as well.
+    - If this comes from AssetBundles/Addressables, you're in a world of pain because of how it internally works.
+  - The way 'memory usage' works on mobile devices is that the OS will kill your app if it uses too much memory.
+    - HOWEVER, everything will be fine until you hit this level of tech debt.
+    - So you might end up going months until you must fix the problem.
+  - The bad news is, this is already too late a point to realistically fix your issues.
+- Garbage Collection causes huge frame-rate spikes.
+  - Almost all of C#'s standard library code is written without these considerations in mind.
+  - Because of the way gameplay code, lazy-inits, lazy-loads, etc. work, this is statistically likelier to happen at the worst possible moments.
+    - This leads to janky gameplay experiences.
+  - You can try to mitigate this by using object-pools, avoiding allocations, etc., but if you're going that far, how is a managed language _really_ helping you?
+- C# compile times and domain reloads are horrific.
+  - And it only gets worse as the project grows larger.
+  - Domain reloads are particularly painful because you can't reload code while in Play Mode.
+    - This kills iteration times.
+  - To 'recompile', you must go through: (stop play mode: 15-20s) -> (recompile + domain reload: 60-180s) -> (start play mode, which will reload the domain: 60-180s) -> (initialisation code executes: 5-10s) -> (reach desired state: 5-10s).
+    - This easily adds up to multiple minutes of waiting time for every small code change.
+- C# language features make it really easy to create a mess.
+  - Implicit casts, boxing/unboxing, inheritance hell; it's all a mess and needs to go.
+  - Even if your coding standards mandate not using these things, it's really easy for new team members, juniors or outsourced contractors to accidentally introduce these issues.
+
+### A New Dawn
+
+So, that brings up to the question - what could be the alternative. Ideally, we'd want a solution that:
+
+- Compiles fast. Reloads fast. Lets you iterate fast.
+- Allows for manual memory management techniques (Arenas, Pools, etc.).
+- Has modern language features without unnecessary complexity.
+- Easy interoperability with C# and Unity APIs.
+- Allows faster iterations by recompiling during Play Mode, and in a build.
+
+**And all of that, is what this package provides.** No other nonsense.
+
+### Why Odin?
+
+Let's look at some alternatives.
+
+#### (Insert Any Interpreted Language Here)
+
+- Does not work on AOT platforms like iOS or consoles.
+- Unity C# only works because of IL2CPP.
+
+#### Jai
+
+- Is in closed beta. Can't rely on everyone having access to the compiler.
+- At some point, might add support for Jai interop as well.
+
+#### C/C++
+
+- In C++, it's easy to shoot yourself in the foot with unnecessary abstractions. Arguably worse than C#.
+  - C has the opposite problem. It has initialiser lists, but that's about the only important thing it has.
+- Compile times are horrible. Even with precompiled headers and unity builds, it's still not great.
+  - C is a bit better in this regard, but still not ideal.
+- Setting up cross-compilation across different platforms is a nightmare.
+- Macros are too unhygienic and lead to unreadable code.
+- Requires too much work into creating platform-specific wrappers for standard library functions.
+  - C is even worse in this regard, because Windows straight up does not support a lot of stuff.
+
+#### Rust
+
+- Steep learning curve.
+- Borrow-checker leads to a lot of friction during development.
+- Compile times are horrible. Even with incremental compilation, it's still not great.
+- No reliability of imported packages working on your target platforms.
+  - Too much volatility due to the package manager being integrated into the build system.
+
+#### And Finally
+
+This is where we come to Odin, which is a perfect middle-ground from all of the above.
+
+- Great compilation times. Even large projects build very fast.
+- Modern language features without unnecessary complexity.
+- Easy interoperability with any language that supports C ABI (C#, C/C++, etc.).
+- Great, and extremely readable standard library.
+- Simple toolchain that is easy to set up across different platforms.
+- It works. The existence of this package is the proof.
 
 ## To-Do
 
