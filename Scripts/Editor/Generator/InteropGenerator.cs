@@ -135,7 +135,8 @@ namespace OdinInterop.Editor
                     continue;
                 }
 
-                GenerateInteropCodeInternal(t);
+                var attr = t.GetCustomAttribute<GenerateOdinInteropAttribute>();
+                GenerateInteropCodeInternal(t, attr);
             }
 
             // export types
@@ -172,7 +173,7 @@ namespace OdinInterop.Editor
             return sb;
         }
 
-        private static void GenerateInteropCodeInternal(Type t)
+        private static void GenerateInteropCodeInternal(Type t, GenerateOdinInteropAttribute attr)
         {
             var tyName = t.FullName.Replace('+', '.').Replace('.', '_');
             var cleanTyName = tyName == "OdinInterop_EngineBindings" ? "" : tyName;
@@ -468,10 +469,8 @@ namespace OdinInterop.Editor
                     }
                 }
 
-                if (t == typeof(EngineBindings))
-                {
-                    s_StrBld.Append(InteropGeneratorInbuiltFiles.ENGINE_BINDINGS_APPEND);
-                }
+                if (!string.IsNullOrWhiteSpace(attr.odinSrcAppend))
+                    s_StrBld.AppendLine(attr.odinSrcAppend);
 
                 File.WriteAllText(tgtFile, s_StrBld.ToString());
             }

@@ -1,4 +1,4 @@
-namespace OdinInterop.Editor
+namespace OdinInterop
 {
     internal static class InteropGeneratorInbuiltFiles
     {
@@ -139,37 +139,45 @@ IsEnabled :: proc {
     IsRendererEnabled,
     IsColliderEnabled,
 }
+";
 
+        internal const string ODIN_INTEROP_HOOK_BINDINGS_APPEND = @"
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalAwake: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalAwakeDelegate : proc() {
     when #defined(OnGlobalAwake) {
         OnGlobalAwake()
     }
 }
 
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalStart: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalStartDelegate : proc() {
     when #defined(OnGlobalStart) {
         OnGlobalStart()
     }
 }
 
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalFixedUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalFixedUpdateDelegate : proc(dt: f32) {
     when #defined(OnGlobalFixedUpdate) {
         OnGlobalFixedUpdate(dt)
     }
 }
 
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalUpdateDelegate : proc(dt, unscaledDt: f32) {
     when #defined(OnGlobalUpdate) {
         OnGlobalUpdate(dt, unscaledDt)
     }
 }
 
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalLateUpdate: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalLateUpdateDelegate : proc(dt, unscaledDt: f32) {
     when #defined(OnGlobalLateUpdate) {
         OnGlobalLateUpdate(dt, unscaledDt)
     }
 }
 
+@(private = ""file"")
 OdinInterop_Internal_OdinInteropHookBindings_OnGlobalDestroy: OdinInterop_Internal_OdinInteropHookBindings_OnGlobalDestroyDelegate : proc() {
     when #defined(OnGlobalDestroy) {
         OnGlobalDestroy()

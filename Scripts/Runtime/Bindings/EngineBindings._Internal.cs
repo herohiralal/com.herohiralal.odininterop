@@ -6,7 +6,7 @@ using UnityAllocator = Unity.Collections.Allocator;
 
 namespace OdinInterop
 {
-    [GenerateOdinInterop]
+    [GenerateOdinInterop(odinSrcAppend = InteropGeneratorInbuiltFiles.ENGINE_BINDINGS_APPEND)]
     internal static unsafe partial class EngineBindings
     {
 
