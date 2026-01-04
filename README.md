@@ -80,7 +80,7 @@ using UnityEngine;
 
 namespace MyNs // can be in any namespace
 {
-    [GenerateGenerateOdinInterop]
+    [GenerateOdinInterop]
     public static partial class ExposeToOdin // can be internal; needs to be static and partial
     {
         private static void ExampleFunction(int a, float b) // must be private
@@ -118,7 +118,7 @@ using UnityEngine;
 
 namespace MyNs // can be in any namespace
 {
-    [GenerateGenerateOdinInterop]
+    [GenerateOdinInterop]
     public static partial class ExposeToOdin // can be internal; needs to be static and partial
     {
         public static partial int FunctionInOdin(float x); // must be public and partial
