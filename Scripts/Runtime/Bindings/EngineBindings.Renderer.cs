@@ -252,8 +252,10 @@ namespace OdinInterop
 
         // GlobalKeyword API
 
+#if UNITY_6000_2_OR_NEWER
         private static GlobalKeyword CreateGlobalKeyword(String8 name) => GlobalKeyword.Create(name.ToString());
         private static String8 GetGlobalKeywordName(GlobalKeyword kw, Allocator allocator) => new String8(kw.name, allocator);
+#endif
 
         // Shader API
 
@@ -271,9 +273,11 @@ namespace OdinInterop
         private static String8 GetGlobalShaderRenderPipeline(Allocator allocator) => new String8(Shader.globalRenderPipeline, allocator);
         private static void SetGlobalShaderRenderPipeline(String8 renderPipelineName) => Shader.globalRenderPipeline = renderPipelineName.ToString();
         private static int GetShaderPropertyId(String8 propertyName) => Shader.PropertyToID(propertyName.ToString());
+#if UNITY_6000_2_OR_NEWER
         private static void EnableShaderKeyword(GlobalKeyword keyword) => Shader.EnableKeyword(keyword);
         private static void DisableShaderKeyword(GlobalKeyword keyword) => Shader.DisableKeyword(keyword);
         private static bool IsShaderKeywordEnabled(GlobalKeyword keyword) => Shader.IsKeywordEnabled(keyword);
+#endif
         private static float GetGlobalShaderFloat(int propertyID) => Shader.GetGlobalFloat(propertyID);
         private static void SetGlobalShaderFloat(int propertyID, float value) => Shader.SetGlobalFloat(propertyID, value);
         private static int GetGlobalShaderInt(int propertyID) => Shader.GetGlobalInt(propertyID);
