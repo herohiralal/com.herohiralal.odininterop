@@ -109,7 +109,9 @@ namespace OdinInterop.Editor
             public static ref StoredState value => ref *(StoredState*)GetPtr();
         }
 
+#if !ODININTEROP_DISABLED
         [InitializeOnLoadMethod]
+#endif
         private static void InitialiseEditor()
         {
             // remove if there's a loaded library from before
@@ -817,6 +819,19 @@ namespace OdinInterop.Editor
 
         private static bool RunProcess(string sn, string tgt, List<string> args, string argsManual, string wd, Dictionary<string, string> extraEnv)
         {
+            try
+            {
+                return RunProcessInternal(sn, tgt, args, argsManual, wd, extraEnv);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                return false;
+            }
+        }
+
+        private static bool RunProcessInternal(string sn, string tgt, List<string> args, string argsManual, string wd, Dictionary<string, string> extraEnv)
+        {
             var psi = new System.Diagnostics.ProcessStartInfo(tgt);
             psi.WorkingDirectory = wd;
 
@@ -929,6 +944,21 @@ namespace OdinInterop.Editor
 
         public void OnPreprocessBuild(BuildReport report)
         {
+            try
+            {
+#if !ODININTEROP_DISABLED
+                PreprocessInternal(report);
+#endif
+            }
+            catch (Exception)
+            {
+                // do something?
+                throw;
+            }
+        }
+
+        private void PreprocessInternal(BuildReport report)
+        {
             var isRelease = !report.summary.options.HasFlag(BuildOptions.Development);
 
             if (report.summary.platform == BuildTarget.StandaloneWindows64)
@@ -988,6 +1018,21 @@ namespace OdinInterop.Editor
     internal class OdinCompilerBuildPostprocessor : IPostprocessBuildWithReport
     {
         public int callbackOrder => 0;
-        public void OnPostprocessBuild(BuildReport report) => OdinCompiler.CleanBuiltLibraries();
+        public void OnPostprocessBuild(BuildReport report)
+        {
+            try
+            {
+#if !ODININTEROP_DISABLED
+                PostprocessInternal(report);
+#endif
+            }
+            catch (Exception)
+            {
+                // do something?
+                throw;
+            }
+        }
+
+        private void PostprocessInternal(BuildReport report) => OdinCompiler.CleanBuiltLibraries();
     }
 }

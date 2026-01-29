@@ -341,7 +341,7 @@ namespace OdinInterop.SourceGenerator
             sb.AppendLine();
 
             // runtime code (bindings)
-            sb.AppendLine("#else");
+            sb.AppendLine("#elif !ODININTEROP_DISABLED");
             sb.AppendLine();
 
             // p/invoke declarations for imported functions
@@ -419,52 +419,31 @@ namespace OdinInterop.SourceGenerator
                 sb.AppendIndent(sbIndent).AppendLine("{");
                 sbIndent++;
 
+                sb.AppendLine("#if ODININTEROP_DISABLED");
+
+                sb.AppendLine()
+                    .AppendFailedReturn(method, sbIndent)
+                    .AppendLine();
+
+                sb.AppendLine("#else").AppendLine();
+
                 sb.AppendLine("#if UNITY_EDITOR || ODININTEROP_RUNTIME_RELOADING");
+
                 sb.AppendIndent(sbIndent)
                     .Append("if (odntrop_delref_")
                     .Append(method.Name)
                     .AppendLine(" == null)")
                     .AppendIndent(sbIndent)
                     .AppendLine("{");
+
                 sbIndent++;
-
-                foreach (var parm in method.Parameters)
-                {
-                    if (parm.RefKind == RefKind.Out)
-                    {
-                        sb
-                            .AppendIndent(sbIndent)
-                            .Append("EmptyRefReturn<")
-                            .AppendTypeName(parm.Type, false)
-                            .Append(">.Fill(out ")
-                            .Append(parm.Name)
-                            .AppendLine(");");
-                    }
-                }
-
-                sb.AppendIndent(sbIndent).Append("return");
-                if (!method.ReturnsVoid)
-                {
-                    if (method.ReturnsByRef || method.ReturnsByRefReadonly)
-                    {
-                        sb.Append(" ref ");
-                        if (method.ReturnsByRefReadonly)
-                            sb.Append("readonly ");
-
-                        sb
-                            .Append("EmptyRefReturn<")
-                            .AppendTypeName(method.ReturnType, false)
-                            .Append(">.corruptedValue");
-                    }
-                    else
-                    {
-                        sb.Append(" default");
-                    }
-                }
-                sb.AppendLine(";");
+                sb.AppendFailedReturn(method, sbIndent);
                 sbIndent--;
-                sb.AppendIndent(sbIndent).AppendLine("}");
-                sb.AppendLine("#endif");
+
+                sb.AppendIndent(sbIndent)
+                    .AppendLine("}")
+                    .AppendLine("#endif")
+                    .AppendLine();
 
                 sb.AppendIndent(sbIndent);
                 if (!method.ReturnsVoid)
@@ -478,6 +457,8 @@ namespace OdinInterop.SourceGenerator
                     .Append("(")
                     .AppendParameters(method.Parameters, null)
                     .AppendLine(");");
+
+                sb.AppendLine("#endif");
 
                 sbIndent--;
                 sb.AppendIndent(sbIndent).AppendLine("}");
@@ -528,6 +509,46 @@ namespace OdinInterop.SourceGenerator
 
     internal static class Extensions
     {
+        public static StringBuilder AppendFailedReturn(this StringBuilder sb, IMethodSymbol method, int sbIndent)
+        {
+            foreach (var parm in method.Parameters)
+            {
+                if (parm.RefKind == RefKind.Out)
+                {
+                    sb
+                        .AppendIndent(sbIndent)
+                        .Append("EmptyRefReturn<")
+                        .AppendTypeName(parm.Type, false)
+                        .Append(">.Fill(out ")
+                        .Append(parm.Name)
+                        .AppendLine(");");
+                }
+            }
+
+            sb.AppendIndent(sbIndent).Append("return");
+            if (!method.ReturnsVoid)
+            {
+                if (method.ReturnsByRef || method.ReturnsByRefReadonly)
+                {
+                    sb.Append(" ref ");
+                    if (method.ReturnsByRefReadonly)
+                        sb.Append("readonly ");
+
+                    sb
+                        .Append("EmptyRefReturn<")
+                        .AppendTypeName(method.ReturnType, false)
+                        .Append(">.corruptedValue");
+                }
+                else
+                {
+                    sb.Append(" default");
+                }
+            }
+            sb.AppendLine(";");
+
+            return sb;
+        }
+
         public static StringBuilder AppendIndent(this StringBuilder sb, int indentVal)
         {
             for (int i = 0; i < indentVal; i++)
