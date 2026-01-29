@@ -123,6 +123,53 @@ namespace OdinInterop.Editor
             HotReload();
         }
 
+        [MenuItem("Tools/Odin Interop/Install Odin Compiler")]
+        private static void InstallOdinCompiler()
+        {
+            bool success;
+
+#if UNITY_EDITOR_WIN
+            success = RunProcess("Odin Compiler Installer", "winget", null, "install -e --id odin-lang.Odin", ODIN_LIB_INPUT_PATH, null);
+#elif UNITY_EDITOR_OSX
+            success = RunProcess("Odin Compiler Installer", "brew", null, "install odin", ODIN_LIB_INPUT_PATH, null);
+#elif UNITY_EDITOR_LINUX
+            success = false;
+#else
+            success = false;
+#endif
+
+            EditorUtility.DisplayDialog(
+                "Odin Compiler Installation",
+                success
+                    ? "Odin Compiler installed successfully. Please restart the Unity Editor to ensure proper functionality."
+                    : "Failed to install Odin Compiler. Please install it manually by following the instructions at https://odin-lang.org/docs/install/",
+                "OK"
+            );
+        }
+
+        [MenuItem("Tools/Odin Interop/Update Odin Compiler")]
+        private static void UpdateOdinCompiler()
+        {
+            bool success;
+
+#if UNITY_EDITOR_WIN
+            success = RunProcess("Odin Compiler Updater", "winget", null, "upgrade -e --id odin-lang.Odin", ODIN_LIB_INPUT_PATH, null);
+#elif UNITY_EDITOR_OSX
+            success = RunProcess("Brew Updater", "brew", null, "update", ODIN_LIB_INPUT_PATH, null)
+                      && RunProcess("Odin Compiler Updater", "brew", null, "upgrade odin", ODIN_LIB_INPUT_PATH, null);
+#elif UNITY_EDITOR_LINUX
+            success = false;
+#else
+            success = false;
+#endif
+
+            EditorUtility.DisplayDialog(
+                "Odin Compiler Update",
+                success ? "Odin Compiler updated successfully." : "Failed to update Odin Compiler.",
+                "OK"
+            );
+        }
+
         [MenuItem("Tools/Odin Interop/Hot Reload %&R")]
         public static unsafe void HotReload()
         {
