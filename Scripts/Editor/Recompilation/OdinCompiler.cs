@@ -123,7 +123,7 @@ namespace OdinInterop.Editor
             HotReload();
         }
 
-        [MenuItem("Tools/Odin Interop/Install Odin Compiler")]
+        [MenuItem("Tools/Odin Interop/Setup/Install")]
         private static void InstallOdinCompiler()
         {
             bool success;
@@ -147,7 +147,7 @@ namespace OdinInterop.Editor
             );
         }
 
-        [MenuItem("Tools/Odin Interop/Update Odin Compiler")]
+        [MenuItem("Tools/Odin Interop/Setup/Update")]
         private static void UpdateOdinCompiler()
         {
             bool success;
